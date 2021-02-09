@@ -11,6 +11,40 @@ class Html2TextChunksConverter:
         return parser.chunks
 
 
+class ArticleDetector:
+
+    def __init__(self,  min_article_length=1000, min_chunk_length=50):
+        self.min_article_length = min_article_length
+        self.min_chunk_length = min_chunk_length
+
+    def is_article(self, chunks): #TODO check for at least one chunk larger than 200 chars?
+        num_of_characters_in_valid_chunks = sum(len(chunk.data) for chunk in chunks
+                                                if len(chunk.data) >= self.min_chunk_length)
+        return num_of_characters_in_valid_chunks >= self.min_article_length
+
+
+class ArticleChunksExtractor:
+
+    def __init__(self, min_text_paragraph_length=200):
+        self.min_text_paragraph_length = min_text_paragraph_length
+
+    def extract(self, chunks):
+        try:
+            index, _ = next((idx, chunk) for idx, chunk in enumerate(chunks)
+                            if len(chunk.data) >= self.min_text_paragraph_length)
+        except StopIteration:
+            return chunks
+        headline_idx = index
+        for i in self.get_range_for_five_preceeding_elements(index):
+            if chunks[i].chunk_type == Chunk.headline_type:
+                headline_idx = i
+        return chunks[headline_idx:]
+
+    @staticmethod
+    def get_range_for_five_preceeding_elements(index):
+        return range(index, max(-1, index - 6), -1)
+
+
 class HTMLParser(object):
 
     def __init__(self):
@@ -51,6 +85,8 @@ class HTMLParser(object):
 
 class ChunkHTMLParser(HTMLParser):
 
+    FLOW_PRESERVING_TAG = ['span', 'sub', 'sup', 'abbr', 'acronym', 'em', 'b', 'font', 'i', 'strong', 'u', 'a']
+
     def __init__(self, min_chunk_length=-1):
         super(ChunkHTMLParser, self).__init__()
         self.min_chunk_length = min_chunk_length
@@ -60,6 +96,7 @@ class ChunkHTMLParser(HTMLParser):
         body = super(ChunkHTMLParser, self).parse(html_input)
         self.chunks = []
         self.current_chunk = None
+        self.current_chunk_type = None
 
         if not body:
             return
@@ -78,22 +115,37 @@ class ChunkHTMLParser(HTMLParser):
             if isinstance(element, NavigableString):
                 self.__handle_text(element)
             else:
+                self.__set_current_chunk_type(element)
                 was_flow_breaking_tag = self.__handle_tag(element)
                 self.__traverse(element.contents)
                 if was_flow_breaking_tag:
                     self.__save_current_chunk_if_valid()
 
+    def __set_current_chunk_type(self, element):
+        if element.name not in self.FLOW_PRESERVING_TAG:
+            self.current_chunk_type = self.__get_element_type(element.name)
+
+    @staticmethod
+    def __get_element_type(tag_name):
+        current_element_type = None
+        if tag_name == 'li':
+            current_element_type = Chunk.list_type
+        elif tag_name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+            current_element_type = Chunk.headline_type
+        return current_element_type
+
     def __handle_text(self, text):
         if is_not_blank(text):
             text = text.strip()
             if self.current_chunk is None:
-                self.current_chunk = Chunk(text)
+                self.current_chunk = Chunk(text, self.current_chunk_type)
+                self.current_chunk_type = None
             else:
                 self.current_chunk.add_data(text)
 
     def __handle_tag(self, tag): #TODO: what about one p after another closing p?
         # TODO: https://developer.mozilla.org/de/docs/Web/HTML/Inline_elemente
-        if tag.name not in ['span', 'sub', 'sup', 'abbr', 'acronym', 'em', 'b', 'font', 'i', 'strong', 'u', 'a']:
+        if tag.name not in self.FLOW_PRESERVING_TAG:
             self.__save_current_chunk_if_valid()
             return True
         return False
@@ -107,8 +159,12 @@ class ChunkHTMLParser(HTMLParser):
 
 class Chunk:
 
-    def __init__(self, data):
+    headline_type = 'headline'
+    list_type = 'list'
+
+    def __init__(self, data, chunk_type=None):
         self.data = data
+        self.chunk_type = chunk_type
 
     def add_data(self, data):
         self.data = "%s %s" % (self.data, data)
@@ -132,4 +188,3 @@ def is_blank(input_string):
 
 def is_not_blank(input_string):
     return not is_blank(input_string)
-

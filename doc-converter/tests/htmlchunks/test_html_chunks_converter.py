@@ -1,5 +1,5 @@
 import os
-from html2text import HTMLParser, ChunkHTMLParser, Chunk, Html2TextChunksConverter
+from htmlchunks import HTMLParser, ChunkHTMLParser, Chunk, Html2TextChunksConverter
 
 
 class TestHtml2TextConverter:
@@ -145,20 +145,51 @@ class TestChunkHTMLParser:
     def test_get_empty_chunks(self):
         assert ChunkHTMLParser().chunks_as_text() == ""
 
-    class TestHTMLParser:
-        html_parser = HTMLParser()
+    def test_get_chunk_type(self):
+        self.parser.parse("<html><body><div>a div</div><li>a li</li><h1>a h1</h1><h3>a h3</h3></body></html>")
+        assert self.parser.chunks == [Chunk('a div', chunk_type=None), Chunk('a li', chunk_type='list'),
+                                      Chunk('a h1', chunk_type='headline'), Chunk('a h3', chunk_type='headline')]
 
-        def test_none_input(self):
-            assert self.html_parser.to_text(None) is None
+    def test_chunk_type_is_cleared_after_being_added(self):
+        self.parser.parse("<html><body><h3>a h3</h3><a>link</a></body></html>")
+        assert self.parser.chunks == [Chunk('a h3', chunk_type='headline'),
+                                      Chunk('link', chunk_type=None)]
 
-        def test_blank_input(self):
-            assert self.html_parser.to_text("  ") is None
+    def test_chunk_type_ignores_flow_preserving_tags(self):
+        self.parser.parse('<html><body><h3><a href="http://www.foo.de">a h3</a></h3><li><em>a</em><span>li<span></li></body></html>')
+        assert self.parser.chunks == [Chunk('a h3', chunk_type='headline'),
+                                      Chunk('a li', chunk_type='list')]
 
-        def test_to_text_default(self):
-            assert self.html_parser.to_text("<html><body><p>foo</p><div class=foo><span>Bär</span></div></body></html>") \
-                   == "foo\nBär"
+    def test_headline_chunks(self):
+        with open(os.path.join(os.path.dirname(__file__), 'resources', 'headlines.html')) as f:
+            content = f.read()
+            self.parser.parse(content)
+            chunks = self.parser.chunks
+            assert len(chunks) == 258
+            headline_chunks = [chunk.data for chunk in chunks if chunk.chunk_type == Chunk.headline_type]
+            assert len(headline_chunks) == 46
+            assert 'COVID-19 Media and Webinars' in headline_chunks
+            assert 'About SHM' in headline_chunks
+            list_chunks = [chunk.data for chunk in chunks if chunk.chunk_type == Chunk.list_type]
+            assert len(list_chunks) == 160
+            assert 'SHM Converge' in list_chunks
+            assert 'Explore patient cases of COVID-19' in list_chunks
 
-        def test_different_separator_text(self):
-            assert (self.html_parser.to_text(
-                "<html><body><p>foo</p><div class=foo><span>Bär</span></div></body></html>",
-                text_separator=" ")) == "foo Bär"
+
+class TestHTMLParser:
+    html_parser = HTMLParser()
+
+    def test_none_input(self):
+        assert self.html_parser.to_text(None) is None
+
+    def test_blank_input(self):
+        assert self.html_parser.to_text("  ") is None
+
+    def test_to_text_default(self):
+        assert self.html_parser.to_text("<html><body><p>foo</p><div class=foo><span>Bär</span></div></body></html>") \
+               == "foo\nBär"
+
+    def test_different_separator_text(self):
+        assert (self.html_parser.to_text(
+            "<html><body><p>foo</p><div class=foo><span>Bär</span></div></body></html>",
+            text_separator=" ")) == "foo Bär"
