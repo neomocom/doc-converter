@@ -11,7 +11,6 @@ def test_pdf():
         text_result = pdf2_text_converter.to_text(f.read())
         assert text_result.author == 'BMC - ITS'
         assert text_result.creation_date == datetime.datetime(2014,11, 7, 20, 16, 50)
-        assert text_result.keywords == []
         assert text_result.title == ''
         assert text_result.text.startswith("The 8P")
         assert "Problems with medications                      □   Medication specific" in text_result.text
@@ -24,7 +23,6 @@ def test_pdf_with_title():
         text_result = pdf2_text_converter.to_text(f.read())
         assert text_result.author == 'BMC - ITS'
         assert text_result.creation_date == datetime.datetime(2009, 11, 9, 16, 3, 25)
-        assert text_result.keywords == []
         assert text_result.title == 'Patient PASS'
         assert text_result.text.startswith("Patient PASS: A Transition Record")
         assert """If I have the following problems …       I should …                              Important contact information:
@@ -37,7 +35,6 @@ def test_pdf_with_multi_pages():
         text_result = pdf2_text_converter.to_text(f.read())
         assert text_result.author == 'Lisa Zoks'
         assert text_result.creation_date == datetime.datetime(2020, 10, 5, 19, 25, 22)
-        assert text_result.keywords == []
         assert text_result.title == ''
         assert text_result.text.startswith("October 5, 2020\n\n\n")
         assert "Dear Administrator Verma," in text_result.text
