@@ -14,7 +14,6 @@ class Pdf2TextConverter:
         return PdfResult("\n\n".join(pages).strip(),
                          author=pdf_document.author.strip(),
                          creation_date=pdf_document.creation_date,
-                         #keywords=[pdf_document.keyword] if pdf_document.keywords else [],  #sometimes not there, check that
                          title=pdf_document.title.strip())
 
 
@@ -24,5 +23,4 @@ class PdfResult:
         self.text = text
         self.author = author
         self.creation_date = creation_date
-        #self.keywords = keywords
         self.title = title

@@ -17,7 +17,7 @@ class ArticleDetector:
         self.min_article_length = min_article_length
         self.min_chunk_length = min_chunk_length
 
-    def is_article(self, chunks): #TODO check for at least one chunk larger than 200 chars?
+    def is_article(self, chunks):
         num_of_characters_in_valid_chunks = sum(len(chunk.data) for chunk in chunks
                                                 if len(chunk.data) >= self.min_chunk_length)
         return num_of_characters_in_valid_chunks >= self.min_article_length
@@ -144,13 +144,12 @@ class ChunkHTMLParser(HTMLParser):
                 self.current_chunk.add_data(text)
 
     def __handle_tag(self, tag): #TODO: what about one p after another closing p?
-        # TODO: https://developer.mozilla.org/de/docs/Web/HTML/Inline_elemente
+        # TODO: https://developer.mozilla.org/de/docs/Web/HTML/Inline_elements
         if tag.name not in self.FLOW_PRESERVING_TAG:
             self.__save_current_chunk_if_valid()
             return True
         return False
 
-    # TODO: here we should check for sentences (avoid missing punctuation before "Weiterlesen" etc.)
     def chunks_as_text(self):
         if self.chunks:
             return "\n".join([chunk.data for chunk in self.chunks])

@@ -1,2 +1,0 @@
-- whole menu bar of span / a tags concatenated (non flow breaking) appear in final text: (https://www.hospitalmedicine.org/practice-management/qpp-quality-payment-program/   + https://www.hospitalmedicine.org/about/partner-with-shm/
-- if a text is very fragmented (<p> and <br>) the start might be cut (https://www.hospitalmedicine.org/policy--advocacy/letters/support-of-bipartisan-and-bicameral-sgr-repeal-legislation/)
