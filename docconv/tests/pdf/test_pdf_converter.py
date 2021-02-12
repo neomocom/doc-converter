@@ -1,6 +1,9 @@
 import os
 import datetime
-from pdf2text import Pdf2TextConverter
+
+import pytest
+from pdf import Pdf2TextConverter
+from pdf import PdfConversionError
 
 pdf2_text_converter = Pdf2TextConverter()
 
@@ -44,3 +47,9 @@ inpatient-only list could have the unintended consequence of increasing out-of-p
 Medicare beneficiaries. For example""" in text_result.text
 
         assert text_result.text.endswith("President, Society of Hospital Medicine")
+
+
+def test_pdf_errors_are_caught():
+        with pytest.raises(PdfConversionError) as ex:
+            pdf2_text_converter.to_text("not bytes")
+        assert str(ex.value) == 'Error occurred while loading pdf document (TypeError)'
