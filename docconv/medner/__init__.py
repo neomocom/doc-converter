@@ -1,5 +1,7 @@
 import spacy
 
+MINIMAL_CONCEPT_LENGTH = 3
+
 
 class MedicalConceptsExtractor:
 
@@ -13,7 +15,7 @@ class MedicalConceptsExtractor:
         seen_concepts = set()
         concepts = []
         for entity in document.ents:
-            if entity.label_ != 'DISEASE':
+            if entity.label_ != 'DISEASE' or len(entity.text) < MINIMAL_CONCEPT_LENGTH:
                 continue
             concept = self.normalize_spaces(entity.text.lower())
             if concept not in seen_concepts:

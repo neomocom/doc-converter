@@ -19,6 +19,12 @@ class TestMedicalConceptExtractor:
         entities = self.extractor.extract(text)
         assert entities == [Concept("pulmonary hypertension", "DISEASE")]
 
+    def test_very_short_diseases_are_discarded(self):
+        text = "The following are legal diseases but often ambiguous: Ameet P. Doshi and (RA). " \
+               "Three character are emough: A PFO for example"
+        entities = self.extractor.extract(text)
+        assert entities == [Concept("pfo", "DISEASE")]
+
     def test_concepts_are_deduplicated(self):
         text = "pulmonary hypertension and more pulmonary hypertension"
         entities = self.extractor.extract(text)
