@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name='doc-converter',
-    version='1.2',
+    version='1.3.0',
     author="NEOMO GmbH",
     author_email="magnus.finkenzeller@neomo.com",
     description="A library to convert them all. Get text and metadata from document types like pdf and html.",
@@ -11,8 +11,8 @@ setuptools.setup(
     install_requires=[
         'python-poppler',
         'BeautifulSoup4',
-        'scispacy==0.4.0',
-        'en-ner-bc5cdr-md @ https://s3-us-west-2.amazonaws.com/ai2-s2-scispacy/releases/v0.4.0/en_ner_bc5cdr_md-0.4.0.tar.gz'
+        'newspaper3k',
+        'regex'
     ],
     tests_require=['pytest'],
 )

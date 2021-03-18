@@ -9,7 +9,7 @@ class Pdf2TextConverter:
             pdf_document = load_from_data(pdf_content)
             pages = []
         except Exception as ex:
-            raise PdfConversionError("Error occurred while loading pdf document (%s)" %str(ex.__class__.__name__))
+            raise PdfConversionError("Error occurred while loading pdf document (%s)" % str(ex.__class__.__name__))
 
         for page_number in range(0, pdf_document.pages):
             page = pdf_document.create_page(page_number)
