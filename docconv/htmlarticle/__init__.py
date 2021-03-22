@@ -10,9 +10,15 @@ IMAGE_URL_EXCLUSION_PATTERN = regex.compile(r".svg\s*$|placeholder|base64|javasc
 AUTHOR_KEYWORD_PATTERN_PART = r'(?:By|Author|Authors|Author\(s\)):'
 AUTHOR_DIRECTLY_AFTER_KEYWORD_PATTERN = regex.compile(rf"{AUTHOR_KEYWORD_PATTERN_PART}\s*(.+?)\s*+$",
                                                       regex.MULTILINE)
+STRIP_BY_FROM_AUTHOR_BEGINNING_PATTERN = regex.compile(r'^By\b', regex.IGNORECASE)
 AUTHOR_WHITELIST_PATTERN = regex.compile(r"^\s*\p{Lu}[-.\p{L}]+\s+.*\b\p{Lu}[-.\p{L}]+(?:\s|$)")
-AUTHOR_BLACKLIST_PATTERN = regex.compile(r"\b(society|center|city|authors?|news|community|gmbh|inc|ltd|corp)\b",
-                                         regex.IGNORECASE)
+AUTHOR_BLACKLIST_PATTERN = regex.compile(r"\b(the|society|center|centre|city|authors?|article|information|news|site|"
+                                         r"community|gmbh|inc|guests?|staff|candidates?|"
+                                         r"ltd|corp|executive|director|academic|faculty|university|colleges?|medicine|"
+                                         r"medical|leadership|hospitals?|health|services?|computer|science|department|"
+                                         r"editorial|editors?|board|faq|united|north|south|new|national|programs?|"
+                                         r"subjects?|journals?|correspondence|google|facebook|www|scholar|scholarships?"
+                                         r"|institutes?|quality|committees?|assistants?|members?)\b", regex.IGNORECASE)
 
 
 class HtmlArticleExtractor:
@@ -31,27 +37,25 @@ class HtmlArticleExtractor:
         image_urls = []
         authors = []
 
-        if top_node:
+        if top_node is not None:
             image_urls = self.extract_images_from_article(newspaper_article, top_node)
-            authors = self.extract_author_from_article(top_node) \
-                or self.extract_authors_from_elements_above_top_node(top_node)
+            authors = self.extract_author_by_keyword_from_article(top_node) \
+                or self.extract_authors_by_keyword_above_article(top_node) \
+                or self.extract_authors_from_li_a_or_span_with_author_class(top_node) \
+                or self.extract_authors_from_li_a_or_span_with_author_class_above_article(top_node) \
+                or self.extract_authors_from_div_with_author_class(top_node) \
+                or self.extract_authors_from_div_with_author_class_above_article(top_node)
 
         return HtmlArticle(newspaper_article.text,
-                           authors=authors,
+                           authors=self.unique_list(authors),
                            title=newspaper_article.title,
                            image_urls=image_urls)
-
-    def extract_authors_from_elements_above_top_node(self, top_node):
-        author_containers_preceding_top_node = \
-            top_node.xpath("./preceding-sibling::*[contains(@class,'author')]")
-        return self.extract_author_from_article(author_containers_preceding_top_node[0]) \
-            if len(author_containers_preceding_top_node) > 0 else []
 
     @staticmethod
     def get_unmodified_top_node_from_original_html(newspaper_article):
         # The clean_top_node is not so clean anymore (tag names are replaced by others, e.g. span -> p)
         modified_top_node = newspaper_article.clean_top_node
-        if not modified_top_node:
+        if modified_top_node is None:
             return None
         top_node_classes = modified_top_node.attrib['class'] if 'class' in modified_top_node.attrib else None
         top_node_candidates_in_original_html = \
@@ -61,12 +65,43 @@ class HtmlArticleExtractor:
                                           top_node_candidates_in_original_html), None)
         return unmodified_top_node
 
-    def extract_author_from_article(self, top_node):
-        return self.look_for_authors_in_tags_following_a_span_containing_only_keyword(top_node) or \
-               self.look_for_author_in_same_tag_that_starts_with_keyword(top_node)
+    def extract_author_by_keyword_from_article(self, top_node, xpath_prefix="."):
+        return self.look_for_authors_in_tags_following_a_span_containing_only_keyword(top_node, xpath_prefix) or \
+               self.look_for_author_in_same_tag_that_starts_with_keyword(top_node, xpath_prefix)
 
-    def look_for_authors_in_tags_following_a_span_containing_only_keyword(self, top_node):
-        author_keyword_elements = top_node.xpath(".//span[normalize-space(text())='By:' "
+    def extract_authors_by_keyword_above_article(self, top_node):
+        return self.extract_author_by_keyword_from_article(top_node, './preceding::*')
+
+    def extract_authors_from_li_a_or_span_with_author_class(self, top_node, xpath_prefix="."):
+        texts_from_elements_with_author_class = top_node.xpath(f"{xpath_prefix}//*[self::li or self::a or self::span]"
+                                                               f"[contains(@class,'author') "
+                                                               f"and not(contains(@class,'affiliation'))]//text()")
+        return self.extract_authors_from_text_parts(texts_from_elements_with_author_class)
+
+    def extract_authors_from_li_a_or_span_with_author_class_above_article(self, top_node):
+        return self.extract_authors_from_li_a_or_span_with_author_class(top_node, './preceding::*')
+
+    def extract_authors_from_div_with_author_class(self, top_node, xpath_prefix='.'):
+        texts_from_div_tags_with_author_class = top_node.xpath(f"{xpath_prefix}//div"
+                                                               f"[contains(@class,'author') "
+                                                               f"and not(contains(@class,'authors-info')) "
+                                                               f"and not(contains(@class,'affiliation')) "
+                                                               f"and not(contains(@class,'related'))]//text()")
+        return self.extract_authors_from_text_parts(texts_from_div_tags_with_author_class)
+
+    def extract_authors_from_div_with_author_class_above_article(self, top_node):
+        return self.extract_authors_from_div_with_author_class(top_node, './preceding::*')
+
+    def extract_authors_from_text_parts(self, texts_from_elements_with_author_class):
+        authors = []
+        if len(texts_from_elements_with_author_class) > 0:
+            for text in texts_from_elements_with_author_class:
+                author_names = self.get_author_names(text.strip())
+                authors.extend(author_names)
+        return authors
+
+    def look_for_authors_in_tags_following_a_span_containing_only_keyword(self, top_node, xpath_prefix="."):
+        author_keyword_elements = top_node.xpath(f"{xpath_prefix}//span[normalize-space(text())='By:' "
                                                  "or normalize-space(text())='By' "
                                                  "or normalize-space(text())='Author:' "
                                                  "or normalize-space(text())='Author' "
@@ -77,7 +112,7 @@ class HtmlArticleExtractor:
         if len(author_keyword_elements) > 0:
             first_author_keyword_element = author_keyword_elements[0]
             keyword_element_following_siblings = first_author_keyword_element.xpath("./following-sibling::*")
-            if len(keyword_element_following_siblings) <= 0:
+            if len(keyword_element_following_siblings) < 1:
                 return []
             element_after_keyword_element = keyword_element_following_siblings[0]
             if element_after_keyword_element.tag == 'dd':
@@ -88,8 +123,8 @@ class HtmlArticleExtractor:
                 return self.extract_authors_from_elements(list_elements)
             return self.extract_authors_from_elements(keyword_element_following_siblings, nested_extraction=False)
 
-    def look_for_author_in_same_tag_that_starts_with_keyword(self, top_node):
-        author_keyword_elements = top_node.xpath(".//*[starts-with(text(),'By:') "
+    def look_for_author_in_same_tag_that_starts_with_keyword(self, top_node, xpath_prefix="."):
+        author_keyword_elements = top_node.xpath(f"{xpath_prefix}//*[starts-with(text(),'By:') "
                                                  "or starts-with(text(),'Author:') "
                                                  "or starts-with(text(),'Authors:') "
                                                  "or starts-with(text(),'Author(s):')]")
@@ -121,9 +156,10 @@ class HtmlArticleExtractor:
         if not text:
             return []
         author_names = []
-        author_candidates = text.split(',')
+        author_candidates = regex.split(r',|\band\b', text)
         for author_candidate in author_candidates:
-            cleansed_author_candidate = HtmlArticleExtractor.normalize_spaces(author_candidate)
+            cleansed_author_candidate = regex.sub(STRIP_BY_FROM_AUTHOR_BEGINNING_PATTERN, '',
+                                                  HtmlArticleExtractor.normalize_spaces(author_candidate)).strip()
             if len(cleansed_author_candidate.split()) <= MAX_NUMBER_OF_WORDS_IN_AUTHOR \
                     and AUTHOR_WHITELIST_PATTERN.match(cleansed_author_candidate)\
                     and not AUTHOR_BLACKLIST_PATTERN.search(cleansed_author_candidate):
@@ -140,7 +176,7 @@ class HtmlArticleExtractor:
                                                                          **{'tag': 'img'})
         image_urls = [urljoin(newspaper_article.url, image_tag.get('src')) for image_tag in image_tags
                       if HtmlArticleExtractor.image_source_is_valid(image_tag.get('src'))]
-        unique_image_urls = list(dict.fromkeys(image_urls))
+        unique_image_urls = HtmlArticleExtractor.unique_list(image_urls)
         return unique_image_urls
 
     @staticmethod
@@ -148,6 +184,10 @@ class HtmlArticleExtractor:
         if not image_url:
             return False
         return not IMAGE_URL_EXCLUSION_PATTERN.search(image_url)
+
+    @staticmethod
+    def unique_list(authors):
+        return list(dict.fromkeys(authors))
 
 
 class HtmlArticle:

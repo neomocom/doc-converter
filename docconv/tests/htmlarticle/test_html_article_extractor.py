@@ -63,94 +63,155 @@ class TestHtmlArticleExtractor:
             assert article.text.startswith('In a time of tremendous uncertainty,')
             assert article.text.endswith('She is a member of SHM’s Practice Analysis Committee.')
 
-    def test_no_authors_extracted_since_located_above_top_node_and_on_different_level(self):
+    def test_authors_extracted_after_keyword_above_top_node_and_on_different_level(self):
         with open(get_test_resource('valid_article.html'), 'r') as file:
             html = file.read()
             article = self.extractor.extract(html, SOURCE_URL)
-            assert article.authors == []
+            assert article.authors == ['Mariana R Gonzalez', 'Lauren Junge-Maughan', 'Lewis A Lipsitz', 'Amber Moore']
 
-    def test_authors_extracted_keyword_in_same_tag(self):
-        with open(get_test_resource('authors_and_keyword_in_same_tag_no_class_on_top_node.html'), 'r') as file:
+    def test_extract_authors_keyword_in_same_tag_before_top_node(self):
+        with open(get_test_resource('authors_and_keyword_in_same_tag_no_class_before_top_node.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.authors == ["Max Power"]
+
+    def test_extract_authors_keyword_in_same_tag_after_top_node_over_before_top_node(self):
+        with open(get_test_resource('authors_and_keyword_in_same_tag_before_and_after_top_node.html'), 'r') as file:
             html = file.read()
             article = self.extractor.extract(html, SOURCE_URL)
             assert article.authors == ["Heather Nye"]
 
-    def test_authors_found_in_element_with_authors_class_before_top_node(self):
-        with open(get_test_resource('authors_and_keyword_in_author_class_el_before_top_node.html'), 'r') as file:
+    def test_authors_found_in_span_with_keyword_before_top_node(self):
+        with open(get_test_resource('authors_and_keyword_in_span_before_top_node.html'), 'r') as file:
             html = file.read()
             article = self.extractor.extract(html, SOURCE_URL)
             assert article.authors == ["Sarah Warren"]
-
-    def test_authors_not_found_in_element_with_no_authors_class_before_top_node(self):
-        with open(get_test_resource('authors_and_keyword_in_non_author_class_el_before_top_node.html'), 'r') as file:
-            html = file.read()
-            article = self.extractor.extract(html, SOURCE_URL)
-            assert article.authors == []
 
     def test_authors_before_top_node_are_only_a_fallback(self):
         with open(get_test_resource('authors_and_keyword_before_and_after_top_node.html'), 'r') as file:
             html = file.read()
             article = self.extractor.extract(html, SOURCE_URL)
             assert article.authors == ['Mariana R Gonzalez', 'Lauren Junge-Maughan', 'Lewis A Lipsitz', 'Amber Moore',
-                                       'ASHA members working in SNFs face a more prolonged recovery.'] #FIXME!!
+                                       'ASHA working in SNFs face a more prolonged recovery.'] #FIXME!!
 
+    def test_authors_in_li_plus_a_with_authors_class_before_top_node(self):
+        with open(get_test_resource('authors_li_a_with_authors_tag_before_top_node_different_level.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.authors == ['Saori Kijima', 'Kazuya Tomihara', 'Masami Tagawa']
+
+    def test_authors_in_div_with_authors_class_before_top_node(self):
+        with open(get_test_resource('authors_in_div_with_authors_class_before_top_node.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.authors == ['Max Early Power']
+
+    def test_authors_in_div_with_authors_class_extracted_after_top_wins(self):
+        with open(get_test_resource('authors_in_div_with_authors_class_after_top_node.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.authors == ['Max Power', 'Mary Power']
+
+    def test_authors_in_a_tag_with_authors_class_before_top_node(self):
+        with open(get_test_resource('authors_in_a_with_authors_class_before_top_node.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.authors == ['Marion C. Leaman', 'Lisa A. Edmonds']
+
+    def test_authors_in_a_tag_with_authors_class_after_top_node_beats_before_node(self):
+        with open(get_test_resource('authors_in_a_tag_with_authors_class_before_and_after_top_node.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.authors == ['Anli Yue Zhou', 'Maria Panagioti', 'Aneez Esmail', 'Raymond Agius',
+                                       'Martie Van Tongeren', 'Peter Bower']
+
+    def test_authors_under_multiple_tags_with_author_class_are_deduplicated(self):
+        with open(get_test_resource('authors_in_multiple_tags_with_author_class.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.authors == ['Elizabeth A Ungerman', 'Keith M Vogt', 'Tetsuro Sakai', 'David G Metro',
+                                       'Phillip S Adams']
+
+    def test_div_tag_with_authors_class_not_inspected_if_authors_found_in_other_tags(self):
+        with open(get_test_resource('authors_in_a_but_author_info_in_div.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.authors == ['Lawrence M. Lewis', 'Evan Schwarz', 'Randall Jotte', 'Colin P. West']
+
+    def test_li_tag_with_authors_affiliation_class_ignored(self):
+        with open(get_test_resource('author_affiliation_li_ignored.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.authors == ['Elizabeth A. Samuels', 'Dowin H. Boatright', 'Ambrose H. Wong',
+                                       'Laura D. Cramer', 'Mayur M. Desai', 'Michael T. Solotke',
+                                       'Darin Latimore', 'Cary P. Gross']
+
+    def test_div_tag_with_related_authors_class_ignored(self):
+        with open(get_test_resource('ignore_related_authors_divs.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.authors == []
 
     def test_no_author_keyword_found_in_top_node(self):
         top_node = etree.XML('<div><p>schnitzel</p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == []
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == []
 
     def test_author_after_keyword_without_semicolon_is_not_enough(self):
         top_node = etree.XML('<div><p>By Max Power</p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == []
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == []
 
     @pytest.mark.parametrize("keyword", ["By", "Author", "Authors", "Author(s)"])
     def test_author_after_keywords_and_semicolon_extracted(self, keyword):
         top_node = etree.XML(f'<div><p>{keyword}: Max Power, Maya Power</p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == ['Max Power', 'Maya Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Max Power', 'Maya Power']
 
     def test_inspect_only_first_tag_with_keyword_followed_by_author(self):
         top_node = etree.XML(f'<div><p>Authors: Max Power</p><p>Authors: Igore Ignore</p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == ['Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Max Power']
 
     def test_author_after_keyword_is_stripped(self):
         top_node = etree.XML('<div><p>By:  Max Power \t  </p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == ['Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Max Power']
 
     def test_author_after_keyword_does_not_need_leading_space(self):
         top_node = etree.XML('<div><p>Author:Max Power</p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == ['Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Max Power']
 
     def test_author_after_keyword_found_if_only_newline_in_between(self):
         top_node = etree.XML('<div><p>Author(s): Max\nPower</p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == ['Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Max Power']
+
+    def test_author_after_keyword_not_found_tag_in_author_name(self):
+        top_node = etree.XML('<div><p>Author: <em>Max</em> Power</p></div>')
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == []
 
     def test_no_authors_extracted_if_keyword_only_followed_by_blanks(self):
         top_node = etree.XML('<div><p>By:  \t  </p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == []
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == []
 
     def test_no_authors_extracted_if_keyword_before_author_not_at_start(self):
         top_node = etree.XML('<div><p>there is a By: Max Power</p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == []
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == []
 
     def test_no_authors_extracted_if_keyword_before_author_not_upper_case(self):
         top_node = etree.XML('<div><p>by: Max Power</p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == []
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == []
 
     def test_author_after_keyword_found_if_newline_in_between(self):
         top_node = etree.XML('<div><p>By: Max \n\r \r \n Power \n </p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == ['Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Max Power']
 
     def test_author_after_keyword_is_validated(self):
         top_node = etree.XML('<div><p>By: Max \t Power, \n Mr. Thompson , MD, some stuff, M. D </p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == ['Max Power', 'Mr. Thompson']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Max Power', 'Mr. Thompson']
 
     def test_author_last_name_comma_first_name_is_not_extracted_correctly(self):
         top_node = etree.XML('<div><p>By: Power, Max, Power, Max Peter</p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == ['Max Peter']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Max Peter']
 
     def test_tag_contains_only_author_keyword_present(self):
         top_node = etree.XML('<div><p>By:</p></div>')
-        assert self.extractor.extract_author_from_article(top_node) == []
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == []
 
     @pytest.mark.parametrize("keyword", ["By", "By:", "Author", "Author:", "Authors", "Authors:",
                                          "Author(s)", "Author(s):"])
@@ -160,7 +221,7 @@ class TestHtmlArticleExtractor:
       
       <dd class="field field-name-field-article-authors "><a href="/authors/tyrrell">Kelly April Tyrrell, MD</a></dd>
       </div>""")
-        assert self.extractor.extract_author_from_article(top_node) == ['Kelly April Tyrrell']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Kelly April Tyrrell']
 
     def test_span_only_containing_keyword_takes_precedence_over_keyword_and_author_in_same_tag(self):
         top_node = etree.XML(f"""<div class="pane-content">
@@ -168,7 +229,7 @@ class TestHtmlArticleExtractor:
              <span class="field-label">By:</span>
          <dd class="field field-name-field-article-authors "><a href="/authors/tyrrell">Max Power</a></dd>
          </div>""")
-        assert self.extractor.extract_author_from_article(top_node) == ['Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Max Power']
 
     def test_span_only_containing_keyword_followed_by_dd_with_multiple_authors(self):
         top_node = etree.XML("""<div class="pane-content">
@@ -178,7 +239,7 @@ class TestHtmlArticleExtractor:
         <i class="envelope">::before</i>
         <strong>M TooShort</strong></dd>
       </div>""")
-        assert self.extractor.extract_author_from_article(top_node) == ['Kelly April Tyrrell', 'Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Kelly April Tyrrell', 'Max Power']
 
     def test_span_only_containing_keyword_followed_by_none(self):
         top_node = etree.XML("""<div class="pane-content">
@@ -186,16 +247,15 @@ class TestHtmlArticleExtractor:
           <span class="field-label">By:</span>
           </div>
           <span>Too far Away</span>
-
       </div>""")
-        assert self.extractor.extract_author_from_article(top_node) == []
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == []
 
     def test_span_only_containing_keyword_followed_by_empty_dd(self):
         top_node = etree.XML("""<div class="pane-content">
           <span class="field-label">By</span>
       <dd class="field field-name-field-article-authors "></dd>
       </div>""")
-        assert self.extractor.extract_author_from_article(top_node) == []
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == []
 
     @pytest.mark.parametrize("keyword", ["By", "By:", "Author", "Author:", "Authors", "Authors:",
                                          "Author(s)", "Author(s):"])
@@ -206,7 +266,7 @@ class TestHtmlArticleExtractor:
       </span>
       <dd class="field field-name-field-article-authors "><a href="/authors/tyrrell">K. \r\n Tyrrell, Max Power</a></dd>
       </div>""")
-        assert self.extractor.extract_author_from_article(top_node) == ['K. Tyrrell', 'Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['K. Tyrrell', 'Max Power']
 
     def test_inspect_only_first_keyword_span_followed_by_dd_with_author(self):
         top_node = etree.XML(f"""<div class="pane-content">
@@ -215,42 +275,42 @@ class TestHtmlArticleExtractor:
         <span class="field-label"> Authors </span>
       <dd class="field field-name-field-article-authors "><a href="/authors/tyrrell">Igor Ignore</a></dd>
       </div>""")
-        assert self.extractor.extract_author_from_article(top_node) == ['Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Max Power']
 
     def test_ignore_other_tag_than_span_that_contains_keyword_only(self):
         top_node = etree.XML("""<div class="pane-content">
           <strong>By:</strong>
       <dd class="field field-name-field-article-authors "><a href="/authors/tyrrell">Kelly April Tyrrell</a></dd>
       </div>""")
-        assert self.extractor.extract_author_from_article(top_node) == []
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == []
 
     def test_span_that_contains_keyword_only_followed_by_other_than_dd(self):
         top_node = etree.XML("""<div class="pane-content">
           <span>Authors:</span>
       <div class="field field-name-field-article-authors "><a href="/authors/tyrrell">Kelly April Tyrrell</a></div>
       </div>""")
-        assert self.extractor.extract_author_from_article(top_node) == []
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == []
 
     def test_span_containing_keyword_followed_by_dd_with_nested_author(self):
         top_node = etree.XML("""<div class="pane-content">
           <span class="field-label">By  </span>
       <dd class="field field-name-field-article-authors "><span>
        <a href="/authors/tyrrell"><strong>K. \r\n Tyrrell, Max Power</strong></a></span></dd></div>""")
-        assert self.extractor.extract_author_from_article(top_node) == ['K. Tyrrell', 'Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['K. Tyrrell', 'Max Power']
 
     def test_span_containing_keyword_followed_by_dd_with_multiple_authors_under_one_nested_tag(self):
         top_node = etree.XML("""<div class="pane-content">
           <span class="field-label">By  </span>
       <dd class="field field-name-field-article-authors "><span>
        <a href="/authors/tyrrell">K. Tyrrell<strong>,</strong>Max Power</a></span></dd></div>""")
-        assert self.extractor.extract_author_from_article(top_node) == ['K. Tyrrell', 'Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['K. Tyrrell', 'Max Power']
 
     def test_span_containing_keyword_followed_by_dd_with_author_partially_nested_deeper(self):
         top_node = etree.XML("""<div class="pane-content">
              <span class="field-label">By  </span>
          <dd class="field field-name-field-article-authors "><span>
           <a href="/authors/tyrrell"><strong><i>\n   </i><em>K.</em>Tyrrell, Max Power</strong></a></span></dd></div>""")
-        assert self.extractor.extract_author_from_article(top_node) == ['K. Tyrrell', 'Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['K. Tyrrell', 'Max Power']
 
     def test_if_first_element_after_keyword_span_is_not_dd_following_siblings_text_extracted(self):
         top_node = etree.XML("""<div class="pane-content">
@@ -263,13 +323,13 @@ class TestHtmlArticleExtractor:
       <p>Marty McFly</p>
       </div>
       </div>""")
-        assert self.extractor.extract_author_from_article(top_node) == ['Max Power', 'Marty McFly']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Max Power', 'Marty McFly']
 
     def test_element_after_keyword_span_ul_li_is_searched_for_authors(self):
         top_node = etree.XML("""<div><span>By</span>
         <ul aria-label="authors" class="rlist--inline loa comma">
         <li><span>Sarah Warren, Max \n Power, MD</span></li></ul></div>""")
-        assert self.extractor.extract_author_from_article(top_node) == ['Sarah Warren', 'Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Sarah Warren', 'Max Power']
 
     def test_element_after_keyword_span_ul_li_is_searched_for_nested_authors(self):
         top_node = etree.XML("""<div><span>By</span>
@@ -277,7 +337,7 @@ class TestHtmlArticleExtractor:
         <li><span><a href="/action/doSearch?field=SarahWarren"><span>Sarah Warren</span></a>
         <sup></sup></span></li>
         <li><span>Max <em>Power</em></span></li></ul></div>""")
-        assert self.extractor.extract_author_from_article(top_node) == ['Sarah Warren', 'Max Power']
+        assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Sarah Warren', 'Max Power']
 
     def test_any_spaces_within_author_are_normalized(self):
         assert self.extractor.get_author_names('Max \t   Power') == ['Max Power']
@@ -303,7 +363,7 @@ class TestHtmlArticleExtractor:
         assert self.extractor.get_author_names('M.Power') == []
 
     def test_second_author_word_can_start_with_dot_and_come_late_to_the_party(self):
-        assert self.extractor.get_author_names('Max power and then some .More') == ['Max power and then some .More']
+        assert self.extractor.get_author_names('Max power plus then some .More') == ['Max power plus then some .More']
 
     @pytest.mark.parametrize("author", ['M. Power', 'M. P.', 'M- P-', 'Li Xu', 'Laura C- et al.', 'Alpesh N.Amin'])
     def test_author_with_2valid_words(self, author):
@@ -323,11 +383,28 @@ class TestHtmlArticleExtractor:
     def test_author_with_names_having_single_char_in_between(self, author):
         assert self.extractor.get_author_names(author) == [author]
 
-    def test_multiple_authors_extracted(self):
+    def test_multiple_authors_separated_by_comma_extracted(self):
         assert self.extractor.get_author_names('Max Power, Mr. Thompson') == ['Max Power', 'Mr. Thompson']
+
+    def test_multiple_authors_separated_by_and_extracted(self):
+        assert self.extractor.get_author_names('Max Power and Mr. Thompson') == ['Max Power', 'Mr. Thompson']
+
+    def test_multiple_authors_separated_by_and_with_word_boundary_not_extracted(self):
+        assert self.extractor.get_author_names('Rhode Island') == ['Rhode Island']
+        assert self.extractor.get_author_names('Randall Jotte') == ['Randall Jotte']
+        assert self.extractor.get_author_names('Max andy Power') == ['Max andy Power']
 
     def test_authors_are_stripped(self):
         assert self.extractor.get_author_names(' Max Power ,   Mr. Thompson  ') == ['Max Power', 'Mr. Thompson']
+
+    def test_by_word_is_stripped_from_author(self):
+        assert self.extractor.get_author_names('By Max By Power') == ['Max By Power']
+        assert self.extractor.get_author_names('by Max By Power') == ['Max By Power']
+        assert self.extractor.get_author_names('Bymax Power') == ['Bymax Power']
+
+
+    def test_by_word_is_stripped_before_validating_author(self):
+        assert self.extractor.get_author_names('By Max') == []
 
     def test_authors_can_be_extracted_over_multiple_lines(self):
         assert self.extractor.get_author_names('Max  \n Power, \n  Mr. \r Thompson  ') == ['Max Power', 'Mr. Thompson']
@@ -335,7 +412,11 @@ class TestHtmlArticleExtractor:
     @pytest.mark.parametrize("no_author", ['M. Power Center', 'Max City Power', 'Corresponding Author',
                                            'For authors and So', 'Marty McFly from Mdedge News',
                                            'Max Power (society Of some Some)', 'The community and Some',
-                                           'ABC-GmbH and Some', 'ABC/Inc.', 'ABC Ltd - AG', 'ABC Corp. '])
+                                           'ABC-GmbH and Some', 'ABC/Inc.', 'ABC Ltd - AG', 'ABC Corp. ',
+                                           'D. S, MD, Executive Director,'
+                                           ' Executive Leadership in Academic Medicine,'
+                                           ' Associate Dean of Faculty Development,'
+                                           ' Drexel University College of Medicine', 'Service Mary'])
     def test_author_containing_special_words_are_discarded(self, no_author):
         assert self.extractor.get_author_names(no_author) == []
 
