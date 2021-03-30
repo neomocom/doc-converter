@@ -6,7 +6,7 @@ from newspaper.configuration import Configuration
 
 MAX_NUMBER_OF_WORDS_IN_AUTHOR = 10
 
-IMAGE_URL_EXCLUSION_PATTERN = regex.compile(r".svg\s*$|placeholder|base64|javascript", regex.IGNORECASE)
+IMAGE_URL_EXCLUSION_PATTERN = regex.compile(r".svg\s*$|placeholder|base64|icon|javascript", regex.IGNORECASE)
 AUTHOR_KEYWORD_PATTERN_PART = r'(?:By|Author|Authors|Author\(s\)):'
 AUTHOR_DIRECTLY_AFTER_KEYWORD_PATTERN = regex.compile(rf"{AUTHOR_KEYWORD_PATTERN_PART}\s*(.+?)\s*+$",
                                                       regex.MULTILINE)
@@ -41,8 +41,10 @@ class HtmlArticleExtractor:
             image_urls = self.extract_images_from_article(newspaper_article, top_node)
             authors = self.extract_author_by_keyword_from_article(top_node) \
                 or self.extract_authors_by_keyword_above_article(top_node) \
-                or self.extract_authors_from_li_a_or_span_with_author_class(top_node) \
-                or self.extract_authors_from_li_a_or_span_with_author_class_above_article(top_node) \
+                or self.extract_authors_from_a_with_author_class(top_node) \
+                or self.extract_authors_from_li_or_span_with_author_class(top_node) \
+                or self.extract_authors_from_a_with_author_class_above_article(top_node) \
+                or self.extract_authors_from_li_or_span_with_author_class_above_article(top_node) \
                 or self.extract_authors_from_div_with_author_class(top_node) \
                 or self.extract_authors_from_div_with_author_class_above_article(top_node)
 
@@ -72,14 +74,31 @@ class HtmlArticleExtractor:
     def extract_authors_by_keyword_above_article(self, top_node):
         return self.extract_author_by_keyword_from_article(top_node, './preceding::*')
 
-    def extract_authors_from_li_a_or_span_with_author_class(self, top_node, xpath_prefix="."):
-        texts_from_elements_with_author_class = top_node.xpath(f"{xpath_prefix}//*[self::li or self::a or self::span]"
+    def extract_authors_from_a_with_author_class(self, top_node, xpath_prefix="."):
+        links_with_author_class = top_node.xpath(f"{xpath_prefix}//a[contains(@class,'author') "
+                                                 f"and not(contains(@class,'affiliation'))]")
+        authors = []
+        for link in links_with_author_class:
+            text_within_link = link.xpath(".//text()")
+            if text_within_link:
+                text_to_extract_from =\
+                    " ".join(text_part for text_part in text_within_link
+                             if len(text_part.strip()) > 1 or text_part.strip() == ',')
+                author_names = self.get_author_names(text_to_extract_from.strip())
+                authors.extend(author_names)
+        return authors
+
+    def extract_authors_from_a_with_author_class_above_article(self, top_node):
+        return self.extract_authors_from_a_with_author_class(top_node, './preceding::*')
+
+    def extract_authors_from_li_or_span_with_author_class(self, top_node, xpath_prefix="."):
+        texts_from_elements_with_author_class = top_node.xpath(f"{xpath_prefix}//*[self::li or self::span]"
                                                                f"[contains(@class,'author') "
                                                                f"and not(contains(@class,'affiliation'))]//text()")
         return self.extract_authors_from_text_parts(texts_from_elements_with_author_class)
 
-    def extract_authors_from_li_a_or_span_with_author_class_above_article(self, top_node):
-        return self.extract_authors_from_li_a_or_span_with_author_class(top_node, './preceding::*')
+    def extract_authors_from_li_or_span_with_author_class_above_article(self, top_node):
+        return self.extract_authors_from_li_or_span_with_author_class(top_node, './preceding::*')
 
     def extract_authors_from_div_with_author_class(self, top_node, xpath_prefix='.'):
         texts_from_div_tags_with_author_class = top_node.xpath(f"{xpath_prefix}//div"
@@ -94,10 +113,9 @@ class HtmlArticleExtractor:
 
     def extract_authors_from_text_parts(self, texts_from_elements_with_author_class):
         authors = []
-        if len(texts_from_elements_with_author_class) > 0:
-            for text in texts_from_elements_with_author_class:
-                author_names = self.get_author_names(text.strip())
-                authors.extend(author_names)
+        for text in texts_from_elements_with_author_class:
+            author_names = self.get_author_names(text.strip())
+            authors.extend(author_names)
         return authors
 
     def look_for_authors_in_tags_following_a_span_containing_only_keyword(self, top_node, xpath_prefix="."):

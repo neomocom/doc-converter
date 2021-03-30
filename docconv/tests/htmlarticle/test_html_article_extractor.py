@@ -132,6 +132,13 @@ class TestHtmlArticleExtractor:
             assert article.authors == ['Elizabeth A Ungerman', 'Keith M Vogt', 'Tetsuro Sakai', 'David G Metro',
                                        'Phillip S Adams']
 
+    def test_authors_with_author_class_in_a_takes_precedence_over_spans_that_are_joined(self):
+        with open(get_test_resource('authors_in_a_with_first_and_last_name_span_child_with_author_class.html'), 'r')\
+                as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.authors == ['Cristina Nituica', 'Oana Alina Bota', 'John Blebea']
+
     def test_div_tag_with_authors_class_not_inspected_if_authors_found_in_other_tags(self):
         with open(get_test_resource('authors_in_a_but_author_info_in_div.html'), 'r') as file:
             html = file.read()
@@ -339,6 +346,99 @@ class TestHtmlArticleExtractor:
         <li><span>Max <em>Power</em></span></li></ul></div>""")
         assert self.extractor.extract_author_by_keyword_from_article(top_node) == ['Sarah Warren', 'Max Power']
 
+    def test_a_with_authors_class_but_no_text(self):
+        top_node = etree.XML("<div><a class='authorsome'></a></div>")
+        assert self.extractor.extract_authors_from_a_with_author_class(top_node) == []
+
+    def test_a_with_authors_class_but_no_text_nested(self):
+        top_node = etree.XML("<div><a class='authorsome'><span></span><div> <b></b></div></a></div>")
+        assert self.extractor.extract_authors_from_a_with_author_class(top_node) == []
+
+    def test_a_with_authors_class_flat_text_no_author(self):
+        top_node = etree.XML("<div class='authorsome'><a class='authorsome'>foo</a></div>")
+        assert self.extractor.extract_authors_from_a_with_author_class(top_node) == []
+
+    def test_a_with_authors_class_flat_text_author(self):
+        top_node = etree.XML("<div><a class='authorsome'>Max Power</a></div>")
+        assert self.extractor.extract_authors_from_a_with_author_class(top_node) == ['Max Power']
+
+    def test_a_with_authors_class_nested_text_author(self):
+        top_node = etree.XML("<div><a class='authorsome'><span> Max Power </span></a></div>")
+        assert self.extractor.extract_authors_from_a_with_author_class(top_node) == ['Max Power']
+
+    def test_a_with_authors_class_multiple_authors_not_separated(self):
+        top_node = etree.XML("""<div><a class='authorsome'><span> Max Power</span>
+        <span>Mary Power </span></a></div>""")
+        assert self.extractor.extract_authors_from_a_with_author_class(top_node) == ['Max Power Mary Power']
+
+    def test_a_with_authors_class_multiple_authors_separated(self):
+        top_node = etree.XML("""<div><a class='authorsome'>
+        <span> Max Power</span>and<span>Mary Power </span></a></div>""")
+        assert self.extractor.extract_authors_from_a_with_author_class(top_node) == ['Max Power', 'Mary Power']
+
+    def test_multiple_a_tags_with_authors_class(self):
+        top_node = etree.XML("""<div><a class='authorsome'>
+        Max <span>Power</span></a> and then <a class='author'><span>Mary</span><span><h1>Power</h1></span></a></div>""")
+        assert self.extractor.extract_authors_from_a_with_author_class(top_node) == ['Max Power', 'Mary Power']
+
+    def test_multiple_nested_a_tags_with_authors_class(self):
+        top_node = etree.XML("""<div><a class='authorsome'>
+           Max <span>Power</span>and <a class='author'><span>Mary</span><span><h1>Power</h1></span></a></a> </div>""")
+        assert self.extractor.extract_authors_from_a_with_author_class(top_node)\
+               == ['Max Power', 'Mary Power', 'Mary Power']
+
+    def test_a_with_authors_class_ignores_stripped_one_char_texts(self):
+        top_node = etree.XML("""<div><a class='shmauthor'>
+        Max <span> a </span><b>1</b> <div>#</div> <span>Power</span><b>MD</b></a> </div>""")
+        assert self.extractor.extract_authors_from_a_with_author_class(top_node) == ['Max Power MD']
+
+    def test_a_with_authors_class_does_not_ignore_tag_with_single_separator(self):
+        top_node = etree.XML("""<div><a class='shmauthor'>
+        Max <span> , </span> <span>Power</span><b>MD</b></a> </div>""")
+        assert self.extractor.extract_authors_from_a_with_author_class(top_node) == ['Power MD']
+
+    @pytest.mark.parametrize("tag", ["li", "span"])
+    def test_li_or_span_with_author_class_but_no_text(self, tag):
+        top_node = etree.XML(f"<div><{tag} class='authorsome'></{tag}></div>")
+        assert self.extractor.extract_authors_from_li_or_span_with_author_class(top_node) == []
+
+    @pytest.mark.parametrize("tag", ["li", "span"])
+    def test_li_or_span_with_authors_class_but_no_text_nested(self, tag):
+        top_node = etree.XML(f"<div><{tag} class='authorsome'><span></span><div> <b> </b></div></{tag}></div>")
+        assert self.extractor.extract_authors_from_li_or_span_with_author_class(top_node) == []
+
+    @pytest.mark.parametrize("tag", ["li", "span"])
+    def test_li_or_span_with_authors_class_with_flat_text_but_no_author(self, tag):
+        top_node = etree.XML(f"<div><{tag} class='authorsome'>foo bar</{tag}></div>")
+        assert self.extractor.extract_authors_from_li_or_span_with_author_class(top_node) == []
+
+    @pytest.mark.parametrize("tag", ["li", "span"])
+    def test_li_or_span_with_authors_class_with_nested_text_but_no_author_in_same_tag(self, tag):
+        top_node = etree.XML(f"<div><{tag} class='authorsome'><span>Max</span><div>Power</div> </{tag}></div>")
+        assert self.extractor.extract_authors_from_li_or_span_with_author_class(top_node) == []
+
+    @pytest.mark.parametrize("tag", ["li", "span"])
+    def test_li_or_span_with_authors_class_with_deeply_nested_text_but_no_author_in_same_tag(self, tag):
+        top_node = etree.XML(f"<div><{tag} class='authorsome'><span>Max <div>Power</div></span> </{tag}></div>")
+        assert self.extractor.extract_authors_from_li_or_span_with_author_class(top_node) == []
+
+    @pytest.mark.parametrize("tag", ["li", "span"])
+    def test_li_or_span_with_authors_class_with_flat_text_and_author(self, tag):
+        top_node = etree.XML(f"<div><{tag} class='author'>Max Power</{tag}></div>")
+        assert self.extractor.extract_authors_from_li_or_span_with_author_class(top_node) == ['Max Power']
+
+    @pytest.mark.parametrize("tag", ["li", "span"])
+    def test_li_or_span_with_authors_class_with_nested_text_and_author(self, tag):
+        top_node = etree.XML(f"<div><{tag} class='author'><span><div>Max Power</div></span></{tag}></div>")
+        assert self.extractor.extract_authors_from_li_or_span_with_author_class(top_node) == ['Max Power']
+
+    @pytest.mark.parametrize("tag", ["li", "span"])
+    def test_multiple_li_or_span_with_authors_class_and_multiple_authors(self, tag):
+        top_node = etree.XML(f"""<div><{tag} class='author'>Mary Power<span><div>Max Power</div></span></{tag}>
+        <div><{tag} class='shmauthor'> Macy Power and Master   Power </{tag}></div> </div>""")
+        assert self.extractor.extract_authors_from_li_or_span_with_author_class(top_node)\
+               == ['Mary Power', 'Max Power', 'Macy Power', 'Master Power']
+
     def test_any_spaces_within_author_are_normalized(self):
         assert self.extractor.get_author_names('Max \t   Power') == ['Max Power']
 
@@ -402,7 +502,6 @@ class TestHtmlArticleExtractor:
         assert self.extractor.get_author_names('by Max By Power') == ['Max By Power']
         assert self.extractor.get_author_names('Bymax Power') == ['Bymax Power']
 
-
     def test_by_word_is_stripped_before_validating_author(self):
         assert self.extractor.get_author_names('By Max') == []
 
@@ -432,17 +531,17 @@ class TestHtmlArticleExtractor:
         with open(get_test_resource('image_in_article.html'), 'r') as file:
             html = file.read()
             article = self.extractor.extract(html, SOURCE_URL)
-            article.image_urls == \
-            ['https://cdn.mdedge.com/files/s3fs-public/styles/medium/public/Kurian_Linda_NY_web.jpg',
-             'https://cdn.mdedge.com/files/s3fs-public/149981_Fig1_Trends_web.jpg',
-             'https://cdn.mdedge.com/files/s3fs-public/149981_Fig2_Avg compensation_web.jpg',
-             'https://cdn.mdedge.com/files/s3fs-public/149981_Fig3_Amt financ supp_web.jpg']
+            assert article.image_urls == \
+                ['https://cdn.mdedge.com/files/s3fs-public/styles/medium/public/Kurian_Linda_NY_web.jpg',
+                 'https://cdn.mdedge.com/files/s3fs-public/149981_Fig1_Trends_web.jpg',
+                 'https://cdn.mdedge.com/files/s3fs-public/149981_Fig2_Avg compensation_web.jpg',
+                 'https://cdn.mdedge.com/files/s3fs-public/149981_Fig3_Amt financ supp_web.jpg']
 
     def test_images_are_extracted_only_once_keeping_the_order(self):
         with open(get_test_resource('image_duplicates_in_article.html'), 'r') as file:
             html = file.read()
             article = self.extractor.extract(html, SOURCE_URL)
-            article.image_urls == \
+            assert article.image_urls == \
             ['https://cdn.mdedge.com/files/s3fs-public/styles/medium/public/Zia_Sareer_web.jpg',
              'https://cdn.mdedge.com/files/s3fs-public/149518_fig1.jpg',
              'https://cdn.mdedge.com/files/s3fs-public/149518_fig2.jpg']
@@ -451,23 +550,23 @@ class TestHtmlArticleExtractor:
         with open(get_test_resource('no_image_in_article.html'), 'r') as file:
             html = file.read()
             article = self.extractor.extract(html, SOURCE_URL)
-            article.image_urls == []
+            assert article.image_urls == []
 
     def test_svgs_and_images_with_no_source_are_ignored(self):
         with open(get_test_resource('invalid_images_in_article.html'), 'r') as file:
             html = file.read()
             article = self.extractor.extract(html, SOURCE_URL)
-            article.image_urls == ['https://cdn.mdedge.com/files/s3fs-public/149981_Fig1_Trends_web.jpg',
-                                   'https://cdn.mdedge.com/files/s3fs-public/149981_Fig2_Avg compensation_web.jpg',
-                                   'http://foo.de/sites/all/themes/custom/medstat_jhm/img/shm_logo_micro.png']
+            assert article.image_urls == \
+                   ['http://foo.de/sites/all/themes/custom/medstat_jhm/img/shm_logo_micro.png',
+                    'https://cdn.mdedge.com/files/s3fs-public/149981_Fig1_Trends_web.jpg',
+                    'https://cdn.mdedge.com/files/s3fs-public/149981_Fig2_Avg '
+                    'compensation_web.jpg']
 
     def test_images_below_article_are_ignored(self):
         with open(get_test_resource('images_below_article.html'), 'r') as file:
             html = file.read()
             article = self.extractor.extract(html, SOURCE_URL)
-            article.image_urls ==  ['https://cdn.mdedge.com/files/s3fs-public/149981_Fig1_Trends_web.jpg',
-                       'https://cdn.mdedge.com/files/s3fs-public/149981_Fig2_Avg compensation_web.jpg',
-                       'http://foo.de/sites/all/themes/custom/medstat_jhm/img/shm_logo_micro.png']
+            assert article.image_urls == []
 
 def get_test_resource(file_name):
     return os.path.join(os.path.dirname(__file__), 'resources', file_name)
