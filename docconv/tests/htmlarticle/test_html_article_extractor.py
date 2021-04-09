@@ -1,6 +1,8 @@
 import os
+import datetime
 
 import pytest
+from dateutil.tz import tzutc, tzoffset
 from lxml import etree
 from htmlarticle import HtmlArticleExtractor
 
@@ -27,7 +29,7 @@ class TestHtmlArticleExtractor:
         article = self.extractor.extract(None, SOURCE_URL)
         assert article.title == ''
         assert article.authors == []
-        assert article.publish_date is None
+        assert article.publication_date is None
         assert article.image_urls == []
 
     def test_minimalistic_html_leads_to_empty_article_text(self):
@@ -38,7 +40,7 @@ class TestHtmlArticleExtractor:
         article = self.extractor.extract("<html><body><p></p></body></html>", SOURCE_URL)
         assert article.title == ''
         assert article.authors == []
-        assert article.publish_date is None
+        assert article.publication_date is None
         assert article.image_urls == []
 
     def test_html_article_text_is_extracted(self):
@@ -567,6 +569,62 @@ class TestHtmlArticleExtractor:
             html = file.read()
             article = self.extractor.extract(html, SOURCE_URL)
             assert article.image_urls == []
+
+    def test_no_valid_publish_date_found(self):
+        html = '''<html><head><meta id="meta-publication_date" name="fo_publication_date" content="foo"/>
+                <meta property="article:published_time" content="2019-28-15 12:28:30"/></head></html>'''
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date is None
+        assert article.publication_date_display is None
+
+
+    def test_no_publish_date_found(self):
+        html = "<html></html"
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date is None
+        assert article.publication_date_display is None
+
+    def test_publish_date_found_by_property_in_meta(self):
+        with open(get_test_resource('publish_date_in_meta_tags.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.publication_date == datetime.datetime(2020, 1, 14, 11, 52, 37, tzinfo=tzutc())
+            assert article.publication_date_display == 'January 14, 2020'
+
+    def test_publish_date_found_by_first_meta_tag_name_in_order(self):
+        with open(get_test_resource('publish_date_in_2_meta_tags.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.publication_date == datetime.datetime(2018, 2, 1, 0, 0)
+            assert article.publication_date_display == 'February 01, 2018'
+
+    def test_year_only_publish_date(self):
+        html = '<html><head><meta id="meta-publication_date" name="fo_publication_date" content="2020"/> </head></html>'
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date == datetime.datetime(2020, 1, 1, 0, 0)
+        assert article.publication_date_display == '2020'
+
+    def test_year_and_month_only_publish_date(self):
+        html = '''<html><head><meta id="meta-publication_date" name="citation_publication_date" content="2020/11"/> 
+                       </head></html>'''
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date == datetime.datetime(2020, 11, 1, 0, 0)
+        assert article.publication_date_display == 'November, 2020'
+
+    def test_publish_date_without_year(self):
+        html = '''<html><head><meta id="meta-publication_date" name="publication_date" content="01-3T17:27:37-01:00"/> 
+               </head></html>'''
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date == datetime.datetime(1970, 1, 3, 17, 27, 37, tzinfo=tzoffset(None, -3600))
+        assert article.publication_date_display == 'January 03'
+
+    def test_publish_date_with_shortened_year(self):
+        html = '''<html><head><meta id="meta-publication_date" name="publicationDate" content="12/12/13"/> 
+               </head></html>'''
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date == datetime.datetime(2013, 12, 12, 0, 0)
+        assert article.publication_date_display == 'December 12, 2013'
+
 
 def get_test_resource(file_name):
     return os.path.join(os.path.dirname(__file__), 'resources', file_name)

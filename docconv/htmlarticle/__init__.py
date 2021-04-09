@@ -1,8 +1,13 @@
+import copy
+from datetime import datetime
+import calendar
 import regex
 from urllib.parse import urljoin
-
 from newspaper import Article as NewspaperArticle
-from newspaper.configuration import Configuration
+from newspaper.cleaners import DocumentCleaner
+import dateutil
+from newspaper.outputformatters import OutputFormatter
+from newspaper.videos.extractors import VideoExtractor
 
 MAX_NUMBER_OF_WORDS_IN_AUTHOR = 10
 
@@ -20,19 +25,35 @@ AUTHOR_BLACKLIST_PATTERN = regex.compile(r"\b(the|society|center|centre|city|aut
                                          r"subjects?|journals?|correspondence|google|facebook|www|scholar|scholarships?"
                                          r"|institutes?|quality|committees?|assistants?|members?)\b", regex.IGNORECASE)
 
+PUBLISH_DATE_TAGS = [
+            {'attribute': 'property', 'value': 'rnews:datePublished', 'content': 'content'},
+            {'attribute': 'property', 'value': 'article:published_time', 'content': 'content'},
+            {'attribute': 'name', 'value': 'OriginalPublicationDate', 'content': 'content'},
+            {'attribute': 'itemprop', 'value': 'datePublished', 'content': 'datetime'},
+            {'attribute': 'property', 'value': 'og:published_time', 'content': 'content'},
+            {'attribute': 'name', 'value': 'article_date_original', 'content': 'content'},
+            {'attribute': 'name', 'value': 'publication_date', 'content': 'content'},
+            {'attribute': 'name', 'value': 'publicationDate', 'content': 'content'},
+            {'attribute': 'name', 'value': 'sailthru.date', 'content': 'content'},
+            {'attribute': 'name', 'value': 'PublishDate', 'content': 'content'},
+            {'attribute': 'pubdate', 'value': 'pubdate', 'content': 'datetime'},
+            {'attribute': 'property', 'value': 'pubDate', 'content': 'content'},
+
+
+        ]
+
 
 class HtmlArticleExtractor:
 
     def __init__(self):
-        self.config = Configuration()
-        self.config.fetch_images = False
+        pass
 
     def extract(self, html, source_url):
         if not html or not html.strip():
             return HtmlArticle("")
-        newspaper_article = NewspaperArticle(source_url, config=self.config)
+        newspaper_article = NewspaperArticle(source_url)
         newspaper_article.download(input_html=html)
-        newspaper_article.parse()
+        self.parse_for_relevant_attributes(newspaper_article)
         top_node = self.get_unmodified_top_node_from_original_html(newspaper_article)
         image_urls = []
         authors = []
@@ -51,7 +72,56 @@ class HtmlArticleExtractor:
         return HtmlArticle(newspaper_article.text,
                            authors=self.unique_list(authors),
                            title=newspaper_article.title,
-                           image_urls=image_urls)
+                           image_urls=image_urls,
+                           publication_date=newspaper_article.publish_date[1]
+                           if newspaper_article.publish_date else None,
+                           publication_date_display=newspaper_article.publish_date[0]
+                           if newspaper_article.publish_date else None)
+
+    def parse_for_relevant_attributes(self, newspaper_article):
+        newspaper_article.throw_if_not_downloaded_verbose()
+
+        newspaper_article.doc = newspaper_article.config.get_parser().fromstring(newspaper_article.html)
+        newspaper_article.clean_doc = copy.deepcopy(newspaper_article.doc)
+
+        if newspaper_article.doc is None:
+            return
+
+        parse_candidate = newspaper_article.get_parse_candidate()
+        newspaper_article.link_hash = parse_candidate.link_hash  # MD5
+
+        document_cleaner = DocumentCleaner(newspaper_article.config)
+        output_formatter = OutputFormatter(newspaper_article.config)
+
+        title = newspaper_article.extractor.get_title(newspaper_article.clean_doc)
+        newspaper_article.set_title(title)
+
+        newspaper_article.publish_date = self.get_publish_date_from_meta_tags(newspaper_article)
+
+        meta_lang = newspaper_article.extractor.get_meta_lang(newspaper_article.clean_doc)
+        newspaper_article.set_meta_language(meta_lang)
+
+        if newspaper_article.config.use_meta_language:
+            newspaper_article.extractor.update_language(newspaper_article.meta_lang)
+            output_formatter.update_language(newspaper_article.meta_lang)
+
+        newspaper_article.doc = document_cleaner.clean(newspaper_article.doc)
+
+        newspaper_article.top_node = newspaper_article.extractor.calculate_best_node(newspaper_article.doc)
+        if newspaper_article.top_node is not None:
+            video_extractor = VideoExtractor(newspaper_article.config, newspaper_article.top_node)
+            newspaper_article.set_movies(video_extractor.get_videos())
+
+            newspaper_article.top_node = newspaper_article.extractor.post_cleanup(newspaper_article.top_node)
+            newspaper_article.clean_top_node = copy.deepcopy(newspaper_article.top_node)
+
+            text, article_html = output_formatter.get_formatted(
+                newspaper_article.top_node)
+            newspaper_article.set_article_html(article_html)
+            newspaper_article.set_text(text)
+
+        newspaper_article.is_parsed = True
+        newspaper_article.release_resources()
 
     @staticmethod
     def get_unmodified_top_node_from_original_html(newspaper_article):
@@ -207,12 +277,48 @@ class HtmlArticleExtractor:
     def unique_list(authors):
         return list(dict.fromkeys(authors))
 
+    def get_publish_date_from_meta_tags(self, newspaper_article):
+        for known_meta_tag in PUBLISH_DATE_TAGS:
+            meta_tags = newspaper_article.extractor.parser.getElementsByTag(
+                newspaper_article.clean_doc,
+                attr=known_meta_tag['attribute'],
+                value=known_meta_tag['value'])
+            if meta_tags:
+                original_publish_date_str = newspaper_article.extractor.parser.getAttribute(
+                    meta_tags[0],
+                    known_meta_tag['content'])
+                publish_date_time = self.parse_date(original_publish_date_str)
+                if publish_date_time:
+                    return self.display_date(original_publish_date_str), publish_date_time
+        return None
+
+    def parse_date(self, date_str):
+        if not date_str:
+            return None
+        try:
+            return dateutil.parser.parse(date_str, default=datetime(1970, 1, 1))
+        except (ValueError, OverflowError, AttributeError, TypeError):
+            return None
+
+    def display_date(self, date_str):
+        if not date_str:
+            return None
+        try:
+            date_result = dateutil.parser.DEFAULTPARSER._parse(date_str)[0]
+            year = date_result.year if date_result.year else ""
+            month = calendar.month_name[date_result.month] if date_result.month else ""
+            day = f" {str(date_result.day).zfill(2)}" if date_result.day else ""
+            return f"{month}{day}, {year}".strip(", ")
+        except (ValueError, OverflowError, AttributeError, TypeError):
+            return None
 
 class HtmlArticle:
 
-    def __init__(self, text, title='', authors=[], publish_date=None, image_urls=[]):
+    def __init__(self, text, title='', authors=[], publication_date=None, publication_date_display=None, image_urls=[]):
         self.text = text
         self.authors = authors
         self.image_urls = image_urls
-        self.publish_date = publish_date
+        self.publication_date = publication_date
+        self.publication_date_display = publication_date_display
         self.title = title
+
