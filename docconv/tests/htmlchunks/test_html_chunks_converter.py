@@ -112,6 +112,14 @@ class TestChunkHTMLParser:
                           "<![CDATA[PFTEST0__COUNTER_6__:4:199:, PFTEST0__COUNTER_7__:4:199:]]></body></html>")
         assert self.parser.chunks == []
 
+    def test_header_content_is_ignored(self):
+        self.parser.parse("<html><body><header><div>ignore</div></header><div>Divme</div></body></html>")
+        assert self.parser.chunks == [Chunk("Divme")]
+
+    def test_footer_content_is_ignored(self):
+        self.parser.parse("<html><body><div>Divme</div><footer><div>ignore</div></footer></body></html>")
+        assert self.parser.chunks == [Chunk("Divme")]
+
     def test_ignore_result_chunks_if_too_short(self):
         self.parser = ChunkHTMLParser(min_chunk_length=3)
         self.parser.parse("<html><body><a>.</a><div>ab</div>ba<tr>  ab </tr><div>abc<div><u>m- </u><p>  .\t\n\r</p><em>abc</em>d \t\r</body></html>")
@@ -126,6 +134,15 @@ class TestChunkHTMLParser:
             actualChunks = self.parser.chunks
             assert len(actualChunks) == 62
             assert Chunk("Wesendonkstr. 63") in actualChunks
+
+    def test_parse_versicherungs_page(self):
+        with open(os.path.join(os.path.dirname(__file__), 'resources', 'versicherung.html')) as f:
+            content = f.read()
+            self.parser.parse(content)
+            actualChunks = self.parser.chunks
+            assert len(actualChunks) == 106
+            assert actualChunks[0].data.startswith("Sie sind hier:")
+            assert actualChunks[-1].data.startswith("* Ja, Sie erklären sich mit den Datenschutzrichtlinien ")
 
     def test_parse_whole_energiesparen_page_as_string(self):
         with open(os.path.join(os.path.dirname(__file__), 'resources', 'energiesparen.html')) as f:
@@ -165,15 +182,17 @@ class TestChunkHTMLParser:
             content = f.read()
             self.parser.parse(content)
             chunks = self.parser.chunks
-            assert len(chunks) == 258
+            assert len(chunks) == 86
             headline_chunks = [chunk.data for chunk in chunks if chunk.chunk_type == Chunk.headline_type]
-            assert len(headline_chunks) == 46
+            assert len(headline_chunks) == 39
             assert 'COVID-19 Media and Webinars' in headline_chunks
-            assert 'About SHM' in headline_chunks
+            assert 'SHM COVID-19 Resources' in headline_chunks
+            assert 'About SHM' not in headline_chunks
             list_chunks = [chunk.data for chunk in chunks if chunk.chunk_type == Chunk.list_type]
-            assert len(list_chunks) == 160
-            assert 'SHM Converge' in list_chunks
+            assert len(list_chunks) == 12
+            assert 'COVID-19 patients' in list_chunks
             assert 'Explore patient cases of COVID-19' in list_chunks
+            assert 'SHM Converge' not in list_chunks
 
 
 class TestHTMLParser:

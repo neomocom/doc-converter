@@ -72,6 +72,8 @@ class HTMLParser(object):
         self.delete_subtree(declarations_and_comments)
         self.__find_and_delete_sub_tree(soup, 'script')
         self.__find_and_delete_sub_tree(soup, 'style')
+        self.__find_and_delete_sub_tree(soup, 'header')
+        self.__find_and_delete_sub_tree(soup, 'footer')
         return soup
 
     def __find_and_delete_sub_tree(self, soup, tag_name, attr={}):
