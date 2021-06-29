@@ -118,7 +118,7 @@ class HtmlArticleExtractor:
             text, article_html = output_formatter.get_formatted(
                 newspaper_article.top_node)
             newspaper_article.set_article_html(article_html)
-            newspaper_article.set_text(text)
+            newspaper_article.set_text(text.strip())
 
         newspaper_article.is_parsed = True
         newspaper_article.release_resources()
@@ -311,6 +311,7 @@ class HtmlArticleExtractor:
             return f"{month}{day}, {year}".strip(", ")
         except (ValueError, OverflowError, AttributeError, TypeError):
             return None
+
 
 class HtmlArticle:
 

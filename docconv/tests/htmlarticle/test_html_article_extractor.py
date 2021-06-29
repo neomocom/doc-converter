@@ -25,7 +25,7 @@ class TestHtmlArticleExtractor:
         article = self.extractor.extract(" \t ", SOURCE_URL)
         assert article.text == ""
 
-    def test_no_html_leads_to_empty_article_text(self):
+    def test_no_html_leads_to_empty_article_attributes(self):
         article = self.extractor.extract(None, SOURCE_URL)
         assert article.title == ''
         assert article.authors == []
@@ -43,7 +43,7 @@ class TestHtmlArticleExtractor:
         assert article.publication_date is None
         assert article.image_urls == []
 
-    def test_html_article_text_is_extracted(self):
+    def test_html_article_text_is_extracted_and_stripped(self):
         with open(get_test_resource('valid_article.html'), 'r') as file:
             html = file.read()
             article = self.extractor.extract(html, SOURCE_URL)
