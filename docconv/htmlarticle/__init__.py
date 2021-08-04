@@ -291,11 +291,13 @@ class HtmlArticleExtractor:
                 if publish_date_from_meta:
                     return publish_date_from_meta
 
-        ld_script_publication_date = newspaper_article.clean_doc.xpath("//script[@type='application/ld+json']")
-        if ld_script_publication_date and len(ld_script_publication_date) > 0:
+        script_ld_json_strings = newspaper_article.clean_doc.xpath("//script[@type='application/ld+json']")
+        for script_ld_json_string in script_ld_json_strings:
             try:
-                ld_script_publish_date_str = json.loads(ld_script_publication_date[0].text)
-                return self.get_date_result(ld_script_publish_date_str.get('datePublished', None))
+                script_ld_json = json.loads(script_ld_json_string.text)
+                script_ld_publication_date_str = script_ld_json.get('datePublished', None)
+                if script_ld_publication_date_str:
+                    return self.get_date_result(script_ld_publication_date_str)
             except:
                 pass
         return None

@@ -635,6 +635,23 @@ class TestHtmlArticleExtractor:
         assert article.publication_date == datetime.datetime(2021, 7, 12, 12, 31, tzinfo=tzutc())
         assert article.publication_date_display == 'July 12, 2021'
 
+    def test_publish_date_searched_in_all_ld_json_script_in_body(self):
+        html = '''<html><head><script type="application/ld+json"> {"@context": "http:\/\/schema.org", "@type": "NewsArticle",
+                                    "articleSection": "Risikolebensversicherung"
+                                    } 
+                        </script>
+                        <script type="application/ld+json"> {BROKEN "http:\/\/schema.org", "@type": "NewsArticle",
+                                    "datePublished": "2000-07-12T12:31:00Z"
+                                    } 
+                        </script></head><body>
+                        <script type="application/ld+json"> {"@context": "http:\/\/schema.org", "@type": "NewsArticle",
+                                    "datePublished": "2021-07-12T12:31:00Z"
+                                    } 
+                        </script></body></html>'''
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date == datetime.datetime(2021, 7, 12, 12, 31, tzinfo=tzutc())
+        assert article.publication_date_display == 'July 12, 2021'
+
     def test_publish_date_not_found_in_ld_json_script(self):
         html = '''<html><head>
                         <script type="application/ld+json"> {"@context": "http:\/\/schema.org", "@type": "NewsArticle",
