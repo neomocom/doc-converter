@@ -577,7 +577,6 @@ class TestHtmlArticleExtractor:
         assert article.publication_date is None
         assert article.publication_date_display is None
 
-
     def test_no_publish_date_found(self):
         html = "<html></html"
         article = self.extractor.extract(html, SOURCE_URL)
@@ -619,8 +618,50 @@ class TestHtmlArticleExtractor:
         assert article.publication_date_display == 'January 03'
 
     def test_publish_date_with_shortened_year(self):
-        html = '''<html><head><meta id="meta-publication_date" name="publicationDate" content="12/12/13"/> 
+        html = '''<html><head><meta id="meta-publication_date" itemprop="datePublished" content="12/12/13"/> 
                </head></html>'''
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date == datetime.datetime(2013, 12, 12, 0, 0)
+        assert article.publication_date_display == 'December 12, 2013'
+
+    def test_publish_date_found_in_ld_json_script(self):
+        html = '''<html><head>
+                        <script type="application/ld+json"> {"@context": "http:\/\/schema.org", "@type": "NewsArticle",
+                                    "datePublished": "2021-07-12T12:31:00Z",
+                                    "articleSection": "Risikolebensversicherung"
+                                    } 
+                        </script></head></html>'''
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date == datetime.datetime(2021, 7, 12, 12, 31, tzinfo=tzutc())
+        assert article.publication_date_display == 'July 12, 2021'
+
+    def test_publish_date_not_found_in_ld_json_script(self):
+        html = '''<html><head>
+                        <script type="application/ld+json"> {"@context": "http:\/\/schema.org", "@type": "NewsArticle",
+                                    "dateModified": "2021-07-12T12:31:00Z",
+                                    "articleSection": "Risikolebensversicherung"
+                                    } 
+                        </script></head></html>'''
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date is None
+        assert article.publication_date_display is None
+
+    def test_publish_date_not_parsed_from_invalid_ld_json_script(self):
+        html = '''<html><head>
+                        <script type="application/ld+json"> NO JSON:  "datePublished": "2021-07-12T12:31:00Z" 
+                        </script></head></html>'''
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date is None
+        assert article.publication_date_display is None
+
+    def test_publish_date_meta_tags_wins_over_ld_json_script(self):
+        html = '''<html><head>
+                    <meta id="meta-publication_date" itemprop="datePublished" dateTime="12/12/13"/>
+                       <script type="application/ld+json"> {"@context": "http:\/\/schema.org", "@type": "NewsArticle",
+                                    "datePublished": "2021-07-12T12:31:00Z",
+                                    "articleSection": "Risikolebensversicherung"
+                                    } 
+                        </script></head></html>'''
         article = self.extractor.extract(html, SOURCE_URL)
         assert article.publication_date == datetime.datetime(2013, 12, 12, 0, 0)
         assert article.publication_date_display == 'December 12, 2013'

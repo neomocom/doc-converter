@@ -1,4 +1,5 @@
 import copy
+import json
 from datetime import datetime
 import calendar
 import regex
@@ -30,6 +31,7 @@ PUBLISH_DATE_TAGS = [
             {'attribute': 'property', 'value': 'article:published_time', 'content': 'content'},
             {'attribute': 'name', 'value': 'OriginalPublicationDate', 'content': 'content'},
             {'attribute': 'itemprop', 'value': 'datePublished', 'content': 'datetime'},
+            {'attribute': 'itemprop', 'value': 'datePublished', 'content': 'content'},
             {'attribute': 'property', 'value': 'og:published_time', 'content': 'content'},
             {'attribute': 'name', 'value': 'article_date_original', 'content': 'content'},
             {'attribute': 'name', 'value': 'publication_date', 'content': 'content'},
@@ -37,10 +39,8 @@ PUBLISH_DATE_TAGS = [
             {'attribute': 'name', 'value': 'sailthru.date', 'content': 'content'},
             {'attribute': 'name', 'value': 'PublishDate', 'content': 'content'},
             {'attribute': 'pubdate', 'value': 'pubdate', 'content': 'datetime'},
-            {'attribute': 'property', 'value': 'pubDate', 'content': 'content'},
-
-
-        ]
+            {'attribute': 'property', 'value': 'pubDate', 'content': 'content'}
+]
 
 
 class HtmlArticleExtractor:
@@ -96,7 +96,7 @@ class HtmlArticleExtractor:
         title = newspaper_article.extractor.get_title(newspaper_article.clean_doc)
         newspaper_article.set_title(title)
 
-        newspaper_article.publish_date = self.get_publish_date_from_meta_tags(newspaper_article)
+        newspaper_article.publish_date = self.get_publish_date(newspaper_article)
 
         meta_lang = newspaper_article.extractor.get_meta_lang(newspaper_article.clean_doc)
         newspaper_article.set_meta_language(meta_lang)
@@ -277,7 +277,7 @@ class HtmlArticleExtractor:
     def unique_list(authors):
         return list(dict.fromkeys(authors))
 
-    def get_publish_date_from_meta_tags(self, newspaper_article):
+    def get_publish_date(self, newspaper_article):
         for known_meta_tag in PUBLISH_DATE_TAGS:
             meta_tags = newspaper_article.extractor.parser.getElementsByTag(
                 newspaper_article.clean_doc,
@@ -287,12 +287,26 @@ class HtmlArticleExtractor:
                 original_publish_date_str = newspaper_article.extractor.parser.getAttribute(
                     meta_tags[0],
                     known_meta_tag['content'])
-                publish_date_time = self.parse_date(original_publish_date_str)
-                if publish_date_time:
-                    return self.display_date(original_publish_date_str), publish_date_time
+                publish_date_from_meta = self.get_date_result(original_publish_date_str)
+                if publish_date_from_meta:
+                    return publish_date_from_meta
+
+        ld_script_publication_date = newspaper_article.clean_doc.xpath("//script[@type='application/ld+json']")
+        if ld_script_publication_date and len(ld_script_publication_date) > 0:
+            try:
+                ld_script_publish_date_str = json.loads(ld_script_publication_date[0].text)
+                return self.get_date_result(ld_script_publish_date_str.get('datePublished', None))
+            except:
+                pass
         return None
 
-    def parse_date(self, date_str):
+    def get_date_result(self, original_publish_date_str):
+        publish_date_time = self.parse_date(original_publish_date_str)
+        if publish_date_time:
+            return self.display_date(original_publish_date_str), publish_date_time
+
+    @staticmethod
+    def parse_date(date_str):
         if not date_str:
             return None
         try:
@@ -300,7 +314,8 @@ class HtmlArticleExtractor:
         except (ValueError, OverflowError, AttributeError, TypeError):
             return None
 
-    def display_date(self, date_str):
+    @staticmethod
+    def display_date(date_str):
         if not date_str:
             return None
         try:
