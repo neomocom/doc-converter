@@ -624,6 +624,12 @@ class TestHtmlArticleExtractor:
         assert article.publication_date == datetime.datetime(2013, 12, 12, 0, 0)
         assert article.publication_date_display == 'December 12, 2013'
 
+    def test_publish_date_extracted_from_date_meta_tag(self):
+        html = '<html><head><meta name="date" content="20210223T12:10:21"/></head></html>'
+        article = self.extractor.extract(html, SOURCE_URL)
+        assert article.publication_date == datetime.datetime(2021, 2, 23, 12, 10, 21)
+        assert article.publication_date_display == 'February 23, 2021'
+
     def test_publish_date_found_in_ld_json_script(self):
         html = '''<html><head>
                         <script type="application/ld+json"> {"@context": "http:\/\/schema.org", "@type": "NewsArticle",
