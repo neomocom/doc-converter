@@ -9,7 +9,7 @@ setuptools.setup(
     packages=setuptools.find_packages(exclude=["*.tests", "*.tests.*"]),
     python_requires='>=3.6, <4',
     install_requires=[
-        'python-poppler',
+        'python-poppler==0.3.0',
         'BeautifulSoup4',
         'newspaper3k',
         'regex'
