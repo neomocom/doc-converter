@@ -47,8 +47,8 @@ class ArticleChunksExtractor:
 
 class HTMLParser(object):
 
-    def __init__(self):
-        pass
+    def __init__(self, custom_tags_to_remove=[]):
+        self.custom_tags_to_remove = custom_tags_to_remove
 
     def parse(self, html_input):
         body = None
@@ -74,6 +74,9 @@ class HTMLParser(object):
         self.__find_and_delete_sub_tree(soup, 'style')
         self.__find_and_delete_sub_tree(soup, 'header')
         self.__find_and_delete_sub_tree(soup, 'footer')
+        for tag_to_remove in self.custom_tags_to_remove:
+            self.__find_and_delete_sub_tree(soup, tag_to_remove)
+
         return soup
 
     def __find_and_delete_sub_tree(self, soup, tag_name, attr={}):
@@ -89,8 +92,8 @@ class ChunkHTMLParser(HTMLParser):
 
     FLOW_PRESERVING_TAG = ['span', 'sub', 'sup', 'abbr', 'acronym', 'em', 'b', 'font', 'i', 'strong', 'u', 'a']
 
-    def __init__(self, min_chunk_length=-1):
-        super(ChunkHTMLParser, self).__init__()
+    def __init__(self, custom_tags_to_remove=[], min_chunk_length=-1):
+        super(ChunkHTMLParser, self).__init__(custom_tags_to_remove)
         self.min_chunk_length = min_chunk_length
         self.chunks = []
 

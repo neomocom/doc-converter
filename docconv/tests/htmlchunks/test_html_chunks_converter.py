@@ -155,6 +155,16 @@ class TestChunkHTMLParser:
                    in chunks_as_text
             assert len(chunks_as_text.splitlines()) == 232
 
+    def test_parse_cleaning_custom_tags(self):
+        with open(os.path.join(os.path.dirname(__file__), 'resources', 'provinzial.html')) as f:
+            content = f.read()
+            parser = ChunkHTMLParser(custom_tags_to_remove=['oev-header-v1', 'oev-mobile-navigation-v1', 'oev-footer'])
+            parser.parse(content)
+            actualChunks = parser.chunks
+            assert len(actualChunks) == 156
+            assert actualChunks[0].data.startswith("Privat-Haft")
+            assert actualChunks[-1].data == "Schaden melden"
+
     def test_get_chunks_as_string(self):
         self.parser.parse("<html><body><p>foo<u>bla</u></p><br>bar</body></html>")
         assert self.parser.chunks_as_text() == "foo bla\nbar"
