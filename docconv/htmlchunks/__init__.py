@@ -5,8 +5,8 @@ from bs4.element import PreformattedString, NavigableString
 class Html2TextChunksConverter:
 
     @staticmethod
-    def to_text_chunks(html_content):
-        parser = ChunkHTMLParser()
+    def to_text_chunks(html_content, custom_tags_to_remove=[]):
+        parser = ChunkHTMLParser(custom_tags_to_remove=custom_tags_to_remove)
         parser.parse(html_content)
         return parser.chunks
 
