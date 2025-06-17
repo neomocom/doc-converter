@@ -104,6 +104,10 @@ class TestChunkHTMLParser:
         self.parser.parse("<html><body><style>{foo zeug: sliderkram} css</style><div>Divme</div><script type='text/javascript'>some script</body></html>")
         assert self.parser.chunks == [Chunk("Divme")]
 
+    def test_hidden_divs_are_ignored(self):
+        self.parser.parse("<html><body><div shidden>Huhu</div><div hidden class='bla'><div>Ignored</div></div><div>Divme</div></body></html>")
+        assert self.parser.chunks == [Chunk("Huhu"), Chunk("Divme")]
+
     def test_ignore_xml_declarations_and_comments(self):
         self.parser.parse("<html><body><?xml version='1.0' encoding='character encoding' standalone='yes|no'?><?ignore>"
                           "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\""

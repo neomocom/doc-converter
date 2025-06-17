@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name='doc-converter',
-    version='1.3.13',
+    version='1.3.14',
     author="NEOMO GmbH",
     author_email="magnus.finkenzeller@neomo.com",
     description="A library to convert them all. Get text and metadata from document types like pdf and html.",

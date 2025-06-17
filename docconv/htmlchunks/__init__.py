@@ -74,6 +74,7 @@ class HTMLParser(object):
         self.__find_and_delete_sub_tree(soup, 'style')
         self.__find_and_delete_sub_tree(soup, 'header')
         self.__find_and_delete_sub_tree(soup, 'footer')
+        self.__find_and_delete_sub_tree(soup, 'div', attr={"hidden": True})
         for tag_to_remove in self.custom_tags_to_remove:
             self.__find_and_delete_sub_tree(soup, tag_to_remove)
 
