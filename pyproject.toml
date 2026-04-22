@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "doc-converter"
-version = "1.4.0"
+version = "v1.4.2"
 description = "A library to convert them all. Get text and metadata from document types like pdf and html."
 authors = ["Magnus Finkenzeller <magnus.finkenzeller@neomo.com>"]
 readme = "README.md"
@@ -16,14 +16,8 @@ priority = "explicit"
 
 [tool.poetry.dependencies]
 python = ">=3.12,<3.13"
-torch = [
-    { version = "2.11.0", source = "PyPI", markers = "sys_platform == 'darwin'" },
-    { version = "2.11.0", source = "pytorch_cpu", markers = "sys_platform != 'darwin'" }
-]
-torchvision = [
-    { version = "0.26.0", source = "PyPI", markers = "sys_platform == 'darwin'" },
-    { version = "0.26.0", source = "pytorch_cpu", markers = "sys_platform != 'darwin'" }
-]
+torch = { version = "2.11.0", source = "pytorch_cpu" }
+torchvision = { version = "0.26.0", source = "pytorch_cpu" }
 docling = "2.88.0"
 easyocr = "1.7.2"
 beautifulsoup4 = "^4.12.3"
