@@ -4,9 +4,10 @@ from datetime import datetime
 import calendar
 import regex
 from urllib.parse import urljoin
+
+from dateutil.parser import parserinfo, isoparser, parser
 from newspaper import Article as NewspaperArticle
 from newspaper.cleaners import DocumentCleaner
-import dateutil
 from newspaper.outputformatters import OutputFormatter
 from newspaper.videos.extractors import VideoExtractor
 
@@ -25,6 +26,7 @@ AUTHOR_BLACKLIST_PATTERN = regex.compile(r"\b(the|society|center|centre|city|aut
                                          r"editorial|editors?|board|faq|united|north|south|new|national|programs?|"
                                          r"subjects?|journals?|correspondence|google|facebook|www|scholar|scholarships?"
                                          r"|institutes?|quality|committees?|assistants?|members?)\b", regex.IGNORECASE)
+POTENTIAL_DATE_TEXT_BEGINNING_PATTERN = regex.compile(r'^[0-9,./–\- ]+[0-9]\s*')
 
 PUBLISH_DATE_TAGS = [
             {'attribute': 'property', 'value': 'rnews:datePublished', 'content': 'content'},
@@ -96,8 +98,6 @@ class HtmlArticleExtractor:
         title = newspaper_article.extractor.get_title(newspaper_article.clean_doc)
         newspaper_article.set_title(title)
 
-        newspaper_article.publish_date = self.get_publish_date(newspaper_article)
-
         meta_lang = newspaper_article.extractor.get_meta_lang(newspaper_article.clean_doc)
         newspaper_article.set_meta_language(meta_lang)
 
@@ -120,6 +120,7 @@ class HtmlArticleExtractor:
             newspaper_article.set_article_html(article_html)
             newspaper_article.set_text(text.strip())
 
+        newspaper_article.publish_date = self.get_publish_date(newspaper_article)
         newspaper_article.is_parsed = True
         newspaper_article.release_resources()
 
@@ -300,28 +301,33 @@ class HtmlArticleExtractor:
                     return self.get_date_result(script_ld_publication_date_str)
             except:
                 pass
+        if newspaper_article.text:
+            date_candidate_match = POTENTIAL_DATE_TEXT_BEGINNING_PATTERN.search(newspaper_article.text)
+            if date_candidate_match:
+                date_candidate = newspaper_article.text[0:date_candidate_match.end()]
+                return self.get_date_result(date_candidate, dayfirst=True)
         return None
 
-    def get_date_result(self, original_publish_date_str):
-        publish_date_time = self.parse_date(original_publish_date_str)
+    def get_date_result(self, original_publish_date_str, dayfirst=False):
+        publish_date_time = self.parse_date(original_publish_date_str, dayfirst)
         if publish_date_time:
-            return self.display_date(original_publish_date_str), publish_date_time
+            return self.display_date(original_publish_date_str, dayfirst), publish_date_time
 
     @staticmethod
-    def parse_date(date_str):
+    def parse_date(date_str, dayfirst):
         if not date_str:
             return None
         try:
-            return dateutil.parser.parse(date_str, default=datetime(1970, 1, 1))
+            return parser(info=parserinfo(dayfirst=dayfirst)).parse(date_str, default=datetime(1970, 1, 1))
         except (ValueError, OverflowError, AttributeError, TypeError):
             return None
 
     @staticmethod
-    def display_date(date_str):
+    def display_date(date_str, dayfirst):
         if not date_str:
             return None
         try:
-            date_result = dateutil.parser.DEFAULTPARSER._parse(date_str)[0]
+            date_result = parser(info=parserinfo(dayfirst=dayfirst))._parse(date_str)[0]
             year = date_result.year if date_result.year else ""
             month = calendar.month_name[date_result.month] if date_result.month else ""
             day = f" {str(date_result.day).zfill(2)}" if date_result.day else ""

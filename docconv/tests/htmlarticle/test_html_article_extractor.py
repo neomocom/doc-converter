@@ -683,6 +683,12 @@ class TestHtmlArticleExtractor:
         assert article.publication_date == datetime.datetime(2013, 12, 12, 0, 0)
         assert article.publication_date_display == 'December 12, 2013'
 
+    def test_publish_date_found_at_beginning_of_text(self):
+        with open(get_test_resource('publish_date_at_text_beginning.html'), 'r') as file:
+            html = file.read()
+            article = self.extractor.extract(html, SOURCE_URL)
+            assert article.publication_date == datetime.datetime(2026, 5, 12, 0, 0)
+            assert article.publication_date_display == 'May 12, 2026'
 
 def get_test_resource(file_name):
     return os.path.join(os.path.dirname(__file__), 'resources', file_name)
