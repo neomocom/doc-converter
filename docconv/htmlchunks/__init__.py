@@ -5,8 +5,9 @@ from bs4.element import PreformattedString, NavigableString
 class Html2TextChunksConverter:
 
     @staticmethod
-    def to_text_chunks(html_content, custom_tags_to_remove=[]):
-        parser = ChunkHTMLParser(custom_tags_to_remove=custom_tags_to_remove)
+    def to_text_chunks(html_content, custom_tags_to_remove=[], custom_selectors_to_remove=[]):
+        parser = ChunkHTMLParser(custom_tags_to_remove=custom_tags_to_remove,
+                                 custom_selectors_to_remove=custom_selectors_to_remove)
         parser.parse(html_content)
         return parser.chunks
 
@@ -47,8 +48,9 @@ class ArticleChunksExtractor:
 
 class HTMLParser(object):
 
-    def __init__(self, custom_tags_to_remove=[]):
+    def __init__(self, custom_tags_to_remove=[], custom_selectors_to_remove=[]):
         self.custom_tags_to_remove = custom_tags_to_remove
+        self.custom_selectors_to_remove = custom_selectors_to_remove
 
     def parse(self, html_input):
         body = None
@@ -77,12 +79,18 @@ class HTMLParser(object):
         self.__find_and_delete_sub_tree(soup, 'div', attr={"hidden": True})
         for tag_to_remove in self.custom_tags_to_remove:
             self.__find_and_delete_sub_tree(soup, tag_to_remove)
+        for selector_to_remove in self.custom_selectors_to_remove:
+            self.__find_and_delete_sub_tree_by_css_selector(soup, selector_to_remove)
 
         return soup
 
     def __find_and_delete_sub_tree(self, soup, tag_name, attr={}):
         script_elements = soup.findAll(tag_name, attr)
         self.delete_subtree(script_elements)
+
+    def __find_and_delete_sub_tree_by_css_selector(self, soup, css_selector):
+        selected_elements = soup.select(css_selector)
+        self.delete_subtree(selected_elements)
 
     @staticmethod
     def delete_subtree(comments):
@@ -93,8 +101,8 @@ class ChunkHTMLParser(HTMLParser):
 
     FLOW_PRESERVING_TAG = ['span', 'sub', 'sup', 'abbr', 'acronym', 'em', 'b', 'font', 'i', 'strong', 'u', 'a']
 
-    def __init__(self, custom_tags_to_remove=[], min_chunk_length=-1):
-        super(ChunkHTMLParser, self).__init__(custom_tags_to_remove)
+    def __init__(self, custom_tags_to_remove=[], min_chunk_length=-1, custom_selectors_to_remove=[]):
+        super(ChunkHTMLParser, self).__init__(custom_tags_to_remove, custom_selectors_to_remove)
         self.min_chunk_length = min_chunk_length
         self.chunks = []
 
