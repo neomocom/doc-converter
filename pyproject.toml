@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "doc-converter"
-version = "v1.4.4"
+version = "v1.4.6"
 description = "A library to convert them all. Get text and metadata from document types like pdf and html."
 authors = ["Magnus Finkenzeller <magnus.finkenzeller@neomo.com>"]
 readme = "README.md"

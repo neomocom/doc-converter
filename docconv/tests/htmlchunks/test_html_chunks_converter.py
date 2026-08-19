@@ -1,6 +1,10 @@
 import os
 from htmlchunks import HTMLParser, ChunkHTMLParser, Chunk, Html2TextChunksConverter
 
+TEASER_HTML = '<html><body><p>article text</p>' \
+              '<oev-container-v1 class="teaser-list"><p>teaser text</p></oev-container-v1>' \
+              '<div data-teaser="true"><p>other teaser text</p></div></body></html>'
+
 
 class TestHtml2TextConverter:
 
@@ -10,6 +14,11 @@ class TestHtml2TextConverter:
             text_chunks = Html2TextChunksConverter.to_text_chunks(content)
             assert len(text_chunks) == 223
             assert text_chunks[0].data == "Hausbau"
+
+    def test_html_text_converter_removes_custom_selectors(self):
+        text_chunks = Html2TextChunksConverter.to_text_chunks(TEASER_HTML,
+                                                             custom_selectors_to_remove=['.teaser-list'])
+        assert [chunk.data for chunk in text_chunks] == ["article text", "other teaser text"]
 
 
 class TestChunkHTMLParser:
@@ -168,6 +177,45 @@ class TestChunkHTMLParser:
             assert len(actualChunks) == 156
             assert actualChunks[0].data.startswith("Privat-Haft")
             assert actualChunks[-1].data == "Schaden melden"
+
+    def test_parse_cleaning_custom_css_selectors(self):
+        with open(os.path.join(os.path.dirname(__file__), 'resources', 'provinzial.html')) as f:
+            content = f.read()
+            parser = ChunkHTMLParser(custom_tags_to_remove=['oev-header-v1', 'oev-mobile-navigation-v1', 'oev-footer'],
+                                     custom_selectors_to_remove=['oev-container-v1#Leistungen'])
+            parser.parse(content)
+            actual_chunks = parser.chunks
+            assert len(actual_chunks) == 152
+            assert actual_chunks[0].data.startswith("Privat-Haft")
+            assert actual_chunks[-1].data == "Schaden melden"
+            assert "Private Haftpflichtversicherung – Leistungen im Überblick" \
+                   not in [chunk.data for chunk in actual_chunks]
+
+    def test_parse_cleaning_custom_css_selector_for_class(self):
+        parser = ChunkHTMLParser(custom_selectors_to_remove=['.teaser-list'])
+        parser.parse(TEASER_HTML)
+        assert parser.chunks_as_text() == "article text\nother teaser text"
+
+    def test_parse_cleaning_custom_css_selector_for_attribute(self):
+        parser = ChunkHTMLParser(custom_selectors_to_remove=['div[data-teaser]'])
+        parser.parse(TEASER_HTML)
+        assert parser.chunks_as_text() == "article text\nteaser text"
+
+    def test_parse_cleaning_multiple_custom_css_selectors(self):
+        parser = ChunkHTMLParser(custom_selectors_to_remove=['.teaser-list', 'div[data-teaser]'])
+        parser.parse(TEASER_HTML)
+        assert parser.chunks_as_text() == "article text"
+
+    def test_parse_cleaning_custom_tags_and_custom_css_selectors(self):
+        parser = ChunkHTMLParser(custom_tags_to_remove=['oev-container-v1'],
+                                 custom_selectors_to_remove=['div[data-teaser]'])
+        parser.parse(TEASER_HTML)
+        assert parser.chunks_as_text() == "article text"
+
+    def test_parse_without_custom_css_selectors(self):
+        parser = ChunkHTMLParser()
+        parser.parse(TEASER_HTML)
+        assert parser.chunks_as_text() == "article text\nteaser text\nother teaser text"
 
     def test_get_chunks_as_string(self):
         self.parser.parse("<html><body><p>foo<u>bla</u></p><br>bar</body></html>")
